@@ -37,7 +37,7 @@ Account private key (for import in other ACME client):
 
 echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xargs -I {} printf "303e0201010430{}a00706052b81040022" | xxd -r -p | openssl ec -inform DER -conv_form uncompressed -out private_key.pem
 
-# Limitations (any changes against limitations will NOT be accepted):
+# Limitations (changes against limits will NOT be accepted):
 
 - Does ONLY support DNS-PERSIST-01 - this because the client has no state and cannot remember orders or authorizations "across runs". DNS-PERSIST-01 can be validated in one "swoop" without having to pause the execution.
 - Does ONLY support secp384r1 keys - this to make stateless key generation possible.
