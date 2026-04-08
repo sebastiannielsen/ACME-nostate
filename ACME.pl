@@ -4,7 +4,6 @@
 use Net::ACME2;
 use Net::ACME2::LetsEncrypt;
 use Digest::SHA qw(sha384_hex);
-use MIME::Base64;
 use Crypt::Perl::ECDSA;
 use Crypt::Perl::ECDSA::Parse;
 use Crypt::Perl::PKCS10;
