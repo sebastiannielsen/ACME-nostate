@@ -21,9 +21,6 @@ Get DNS-PERSIST-01 record
 
 Just start it in web browser.
 
-Limitations: The domain field only supports up to 42 characters which fits 3-4 domains. This is a limitation due to the ASN1 structure in the CSR getting too fat otherwise and the handling of the 0x81 lengths becomes a bit troublesome.
-I will propably fix it in the future.
-
 Advantages: The client is totally client-side and does ONLY talk to lets encrypt server, meaning you do not have to trust any server.
 
 You can also access the client here: https://sebastiannielsen.github.io/ACME-nostate/
