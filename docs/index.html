@@ -1,0 +1,346 @@
+<html>
+<head>
+<meta name="referrer" content="no-referrer">
+<title>Client-Side DNS-PERSIST-01 ACME2 Client</title>
+<script>
+document.addEventListener('DOMContentLoaded', () => { 
+document.getElementById("genpriv").addEventListener('click', function(e) {genprivkey();});
+document.getElementById("gencrt").addEventListener('click', function(e) {gencert();});
+});
+
+
+async function genprivkey() {
+
+if (document.getElementById("password").value.length == 0) {
+document.getElementById("txtrecord").innerHTML = '<font color="red"><pre>Password cannot be blank. Use a secure password to prevent someone guessing your private key.</pre></font>';
+return;
+}
+
+const hashArray = new Uint8Array(await window.crypto.subtle.digest("SHA-384",new TextEncoder().encode(document.getElementById("password").value)));
+const header = new Uint8Array([0x30, 0x4e,0x02, 0x01, 0x00,0x30, 0x10,0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,0x04, 0x37,0x30, 0x35,0x02, 0x01, 0x01,0x04, 0x30]);
+
+const pkcs8 = new Uint8Array(header.length + hashArray.length);
+pkcs8.set(header);
+pkcs8.set(hashArray, header.length);
+
+CryptKey = await window.crypto.subtle.importKey("pkcs8", pkcs8.buffer, {name: "ECDSA",namedCurve: "P-384"}, true, ["sign"]);
+
+if (document.getElementById("pem").checked) {
+const pem = "-----BEGIN PRIVATE KEY-----\n" + btoa(String.fromCharCode.apply(null, pkcs8)).match(/.{1,64}/g).join("\n") + "\n-----END PRIVATE KEY-----\n\n";
+
+if (document.getElementById("domain").value.length > 4) {
+if (document.getElementById("domain").value.includes("*")) {
+  document.getElementById("pemcert").value = "Domain cannot contain *, because wildcard is automatically generated and included.";
+  return;
+}
+const hexdata = await csrbuilder(CryptKey, document.getElementById("domain").value);
+document.getElementById("pemcert").value = pem + "-----BEGIN CERTIFICATE REQUEST-----\n" + btoa(String.fromCharCode.apply(null, new Uint8Array(arraybuffertosign(hexdata)) )).match(/.{1,64}/g).join("\n") + "\n-----END CERTIFICATE REQUEST-----";
+}
+else
+{
+document.getElementById("pemcert").value = pem;
+}
+}
+else
+{
+document.getElementById("pemcert").value = JSON.stringify(await window.crypto.subtle.exportKey("jwk", CryptKey),null,2);
+}
+
+}
+
+async function gencert() {
+
+if (document.getElementById("password").value.length == 0) {
+document.getElementById("txtrecord").innerHTML = '<font color="red"><pre>Password cannot be blank. Use a secure password to prevent someone guessing your private key.</pre></font>';
+return;
+}
+
+const staging = 1;
+let ServerURL;
+let nonce;
+let accounturi;
+let domains;
+let response;
+if (staging == 1) { ServerURL = "https://acme-staging-v02.api.letsencrypt.org/directory"; } else { ServerURL = "https://acme-v02.api.letsencrypt.org/directory"; }
+
+response = await fetch(ServerURL);
+
+directoryobject = await response.json();
+
+const cadomain = directoryobject.meta.caaIdentities[0];
+const newnonce = directoryobject.newNonce;
+const newacct = directoryobject.newAccount;
+const neworder = directoryobject.newOrder;
+
+response = await fetch(newnonce);
+nonce = response.headers.get("Replay-Nonce");
+
+
+const hashArray = new Uint8Array(await window.crypto.subtle.digest("SHA-384",new TextEncoder().encode(document.getElementById("password").value + "-")));
+const header = new Uint8Array([0x30, 0x4e,0x02, 0x01, 0x00,0x30, 0x10,0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,0x04, 0x37,0x30, 0x35,0x02, 0x01, 0x01,0x04, 0x30]);
+
+const pkcs8 = new Uint8Array(header.length + hashArray.length);
+pkcs8.set(header);
+pkcs8.set(hashArray, header.length);
+
+CryptKey = await window.crypto.subtle.importKey("pkcs8", pkcs8.buffer, {name: "ECDSA",namedCurve: "P-384"}, true, ["sign"]);
+
+const createaccount = {}; 
+
+exportedkey = await window.crypto.subtle.exportKey("jwk", CryptKey);
+delete exportedkey.ext;
+delete exportedkey.key_ops;
+delete exportedkey.d;
+
+createaccount.protected = btoa('{"alg": "ES384", "jwk": ' + JSON.stringify(exportedkey,null,0) + ', "nonce": "' + nonce + '", "url": "' + newacct + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+createaccount.payload = "eyJ0ZXJtc09mU2VydmljZUFncmVlZCI6IHRydWV9";
+createaccount.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},CryptKey, new TextEncoder().encode(createaccount.protected + "." + createaccount.payload))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+
+response = await fetch(newacct, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(createaccount)});
+nonce = response.headers.get("Replay-Nonce");
+accounturi = response.headers.get("Location");
+document.getElementById("txtrecord").innerHTML = '<pre>_validation-persist.YOURDOMAIN.TLD IN TXT "' + cadomain + ';accounturi=' + accounturi + ';policy=wildcard"</pre>';
+
+domains = document.getElementById("domain").value
+const createorder = {}; 
+
+if (domains.length > 4) {
+
+let domainarray = [];
+let autharray = [];
+let payloadstring = '{"identifiers": [';
+let orderurl = "";
+
+if (domains.includes("*")) {
+  document.getElementById("pemcert").value = "Domain cannot contain *, because wildcard is automatically generated and included.";
+  return;
+}
+
+if (domains.includes(",")) {
+let newdomains = [];
+newdomains = domains.split(",");
+newdomains.forEach(function (item, index) {domainarray.push('{"type": "dns", "value": "' + item + '"}');domainarray.push('{"type": "dns", "value": "*.' + item + '"}');});
+}
+else
+{
+domainarray[0] = '{"type": "dns", "value": "' + domains + '"}';
+domainarray[1] = '{"type": "dns", "value": "*.' + domains + '"}';
+}
+
+domainarray.forEach(function (item, index) { payloadstring = payloadstring + item + "," });
+payloadstring = payloadstring.substring(0, payloadstring.length - 1);
+payloadstring = payloadstring + "]}";
+
+createorder.protected = btoa('{"alg": "ES384", "kid": "' + accounturi + '", "nonce": "' + nonce + '", "url": "' + neworder + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+createorder.payload =  btoa(payloadstring).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+createorder.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},CryptKey, new TextEncoder().encode(createorder.protected + "." + createorder.payload))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+response = await fetch(neworder, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(createorder)});
+nonce = response.headers.get("Replay-Nonce");
+orderurl = response.headers.get("Location");
+
+const authz = await response.json();
+autharray = authz.authorizations;
+const finalizeurl = authz.finalize;
+
+for (const item of autharray) {
+nonce = await doauth(item, accounturi, nonce, CryptKey);
+}
+
+let returnarray = [];
+const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, accounturi, nonce, CryptKey);nonce = returnarray[0]; if (returnarray[1] === 'invalid') {clearInterval(checkApiInterval);document.getElementById("pemcert").value = "Failed validation for one or more domains. Please ensure you have set up the correct records, that you have entered the correct password corresponding to your _validation-persist record, and that your CAA records are set up properly, and that you have not forgot the policy=wildcard addition to the DNS-PERSIST-01 record.";}; if (returnarray[1] === 'ready') {clearInterval(checkApiInterval);finalizeorder(finalizeurl, accounturi, nonce, CryptKey, orderurl);}} catch (error) {console.error("Fel vid anrop:", error);}}, 2500);
+}
+
+}
+
+
+async function finalizeorder(url, account, nonce, privatekey, orderurl) {
+
+
+const hashArray = new Uint8Array(await window.crypto.subtle.digest("SHA-384",new TextEncoder().encode(document.getElementById("password").value)));
+const header = new Uint8Array([0x30, 0x4e,0x02, 0x01, 0x00,0x30, 0x10,0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,0x04, 0x37,0x30, 0x35,0x02, 0x01, 0x01,0x04, 0x30]);
+
+const pkcs8 = new Uint8Array(header.length + hashArray.length);
+pkcs8.set(header);
+pkcs8.set(hashArray, header.length);
+
+CryptKey = await window.crypto.subtle.importKey("pkcs8", pkcs8.buffer, {name: "ECDSA",namedCurve: "P-384"}, true, ["sign"]);
+const hexdata = await csrbuilder(CryptKey, document.getElementById("domain").value);
+
+let finalize = {};
+finalize.protected = btoa('{"alg": "ES384", "kid": "' + account + '", "nonce": "' + nonce + '", "url": "' + url + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+finalize.payload = btoa('{"csr": "' + btoa(String.fromCharCode.apply(null, new Uint8Array(arraybuffertosign(hexdata)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+finalize.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},privatekey, new TextEncoder().encode(finalize.protected + "." + finalize.payload))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+let response = await fetch(url, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(finalize)});
+nonce = response.headers.get("Replay-Nonce");
+
+
+let returnarray = [];
+const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, account, nonce, privatekey);nonce = returnarray[0]; if (returnarray[1] === 'valid') {clearInterval(checkApiInterval);fetchcert(returnarray[2], account, nonce, privatekey);}} catch (error) {console.error("Fel vid anrop:", error);}}, 2500);
+}
+
+async function fetchcert(url, account, nonce, privatekey) {
+let fetchcrt = {};
+fetchcrt.protected = btoa('{"alg": "ES384", "kid": "' + account + '", "nonce": "' + nonce + '", "url": "' + url + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+fetchcrt.payload = "";
+fetchcrt.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},privatekey, new TextEncoder().encode(fetchcrt.protected + "."))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+response = await fetch(url, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(fetchcrt)});
+
+document.getElementById("pemcert").value = await response.text();
+}
+
+async function checkorder(url, account, nonce, privatekey) {
+let authfetch = {};
+let challengeurl;
+authfetch.protected = btoa('{"alg": "ES384", "kid": "' + account + '", "nonce": "' + nonce + '", "url": "' + url + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+authfetch.payload = "";
+authfetch.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},privatekey, new TextEncoder().encode(authfetch.protected + "."))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const response = await fetch(url, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(authfetch)});
+
+nonce = response.headers.get("Replay-Nonce");
+const authobject = await response.json();
+return [ nonce, authobject.status, authobject?.certificate ?? "" ];
+}
+
+
+async function doauth(url, account, nonce, privatekey) {
+let authfetch = {};
+let challengeurl;
+let response;
+authfetch.protected = btoa('{"alg": "ES384", "kid": "' + account + '", "nonce": "' + nonce + '", "url": "' + url + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+authfetch.payload = "";
+authfetch.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},privatekey, new TextEncoder().encode(authfetch.protected + "."))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+response = await fetch(url, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(authfetch)});
+
+nonce = response.headers.get("Replay-Nonce");
+const authobject = await response.json();
+challengeurl = "";
+authobject.challenges.forEach(function (item, index) { if (item.type == "dns-persist-01") { challengeurl = item.url; }});
+
+response = {};
+authfetch = {};
+authfetch.protected = btoa('{"alg": "ES384", "kid": "' + account + '", "nonce": "' + nonce + '", "url": "' + challengeurl + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+authfetch.payload =  "e30";
+authfetch.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},privatekey, new TextEncoder().encode(authfetch.protected + ".e30"))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+response = await fetch(challengeurl, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(authfetch)});
+
+return response.headers.get("Replay-Nonce");
+} 
+
+
+async function csrbuilder(certkey, sans) {
+
+let asn1builder = "";
+let dn = "";
+let sansobject = "";
+let versionheader = "020100";
+
+if (sans.includes(",")) {
+newdomains = sans.split(",");
+newdomains.forEach(function (item, index) { const wclength = item.length + 2; sansobject = sansobject + "82" + item.length.toString(16).padStart(2, '0') + asn_createhex(item) + "82" + wclength.toString(16).padStart(2, '0') + asn_createhex("*." + item); sanlength = sanlength + (item.length * 2) + 6;});
+dn = asn_createhex(newdomains[0]);
+}
+else
+{
+let wclength = sans.length + 2;
+sansobject = "82" + sans.length.toString(16).padStart(2, '0') + asn_createhex(sans) + "82" + wclength.toString(16).padStart(2, '0') + asn_createhex("*." + sans);
+sanlength = (sans.length * 2) + 6;
+dn = asn_createhex(sans);
+}
+sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+sansobject = "0603551d1104" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+sansobject = "06092a864886f70d01090e31" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+sansobject = "a0" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+
+dn = "06035504030c" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
+dn = "30" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
+dn = "31" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
+dn = "30" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
+
+privkeydata = await window.crypto.subtle.exportKey("jwk", certkey);
+delete privkeydata.d
+privkeydata.key_ops = ["verify"];
+const pubkeydata = await window.crypto.subtle.importKey("jwk",privkeydata,{ name: "ECDSA", namedCurve: "P-384" },true,["verify"]);
+spki = asn_createhex(String.fromCharCode.apply(null, new Uint8Array(await window.crypto.subtle.exportKey("spki", pubkeydata))));
+
+
+asn1builder = versionheader + dn + spki + sansobject;
+
+if (asn1builder.length > 511) {
+const secondbyte = Math.trunc(asn1builder.length / 512);
+const firstbyte = (asn1builder.length / 2) % 256;
+asn1builder = "3082" + secondbyte.toString(16).padStart(2, '0') + firstbyte.toString(16).padStart(2, '0') + asn1builder
+}
+else
+{
+asn1builder = "3081" + (asn1builder.length / 2).toString(16).padStart(2, '0') + asn1builder
+}
+
+const signdata = asn_createhex(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},certkey, arraybuffertosign(asn1builder) ))) );
+
+let rint = signdata.substring(0, 96);
+if (parseInt(rint.substring(0, 2), 16) >= 0x80) {
+rint = "00" + rint;
+}
+let sint = signdata.substring(96, 192);
+if (parseInt(sint.substring(0, 2), 16) >= 0x80) {
+sint = "00" + sint;
+}
+
+rint = "02" + (rint.length / 2).toString(16).padStart(2, '0') + rint;
+sint = "02" + (sint.length / 2).toString(16).padStart(2, '0') + sint;
+let asn1signdata = "0030" + ((rint.length + sint.length) / 2).toString(16).padStart(2, '0') + rint + sint;
+asn1signdata = "300a06082a8648ce3d04030303" + (asn1signdata.length / 2).toString(16).padStart(2, '0') + asn1signdata;
+
+let signeddata = asn1builder + asn1signdata;
+
+const signsecondbyte = Math.trunc(signeddata.length / 512);
+const signfirstbyte = (signeddata.length / 2) % 256;
+const alldata = "3082" + signsecondbyte.toString(16).padStart(2, '0') + signfirstbyte.toString(16).padStart(2, '0') + signeddata;
+
+return alldata;
+}
+
+
+function asn_createhex(str)
+{
+var hexarr = [];
+for (var i = 0; i < str.length; i++)
+{
+hexarr.push(str.charCodeAt(i).toString(16).padStart(2, '0'));
+}
+return hexarr.join('');
+}
+
+
+function arraybuffertosign(input) {
+    var pairs = input.match(/[\dA-F]{2}/gi);
+    var integers = pairs.map(function(s) {return parseInt(s, 16);});
+    var array = new Uint8Array(integers);
+    return array.buffer;
+}
+
+
+</script>
+</head>
+<body>
+<h2>Password: <input style="font-size: 25" type="password" id="password"></h2>
+<h2>Domains: <input style="font-size: 25" type="text" id="domain" maxlength="41"> (Comma-separated, max 42 characters)</h2>
+<h2>Leave "Domains" blank + "Generate certificate" if you just want to get your DNS-PERSIST-01 record.</h2>
+<h2>Leave "Domains" blank + "Generate private key + CSR" for just the private key (NO CSR).</h2>
+<button id="gencrt" style="font-size: 25">Generate certificate</button> <button id="genpriv" style="font-size: 25">Generate private key + CSR</button><br>
+<h2><input type="radio" name="pkeytype" id="pem" style="height:15px; width:15px;" checked> PKCS8/PEM-format -- <input type="radio" style="height:15px; width:15px;" name="pkeytype"> JWK-format</h2>
+<br>
+<h2>Add following to DNS:</h2>
+<h2><div id="txtrecord"><pre>&nbsp;</pre></div></h2>
+<h2>Certificate or private key:</h2>
+<textarea id="pemcert" style="font-size: 20" rows="16" cols="80"></textarea>
+<h2>To generate key on server, run following command:</h2>
+<table border="1"><tr><td><pre> echo -n "[YOUR_PASSWORD]" | openssl dgst -sha384 -binary | xxd -p -c 48 | xargs -I {} printf "303e0201010430{}a00706052b81040022" | xxd -r -p | openssl ec -inform DER -conv_form uncompressed -out private_key.pem </pre></td></tr></table>
+</body>
+</html>
