@@ -20,8 +20,10 @@ Get DNS-PERSIST-01 record
 # ACME.html usage:
 
 Just start it in web browser.
+
 Limitations: The domain field only supports up to 42 characters which fits 3-4 domains. This is a limitation due to the ASN1 structure in the CSR getting too fat otherwise and the handling of the 0x81 lengths becomes a bit troublesome.
 I will propably fix it in the future.
+
 Advantages: The client is totally client-side and does ONLY talk to lets encrypt server, meaning you do not have to trust any server.
 
 # Key generation on a server - run the following command in console (can be done offline without network connection if you want and does not need root):
@@ -46,6 +48,9 @@ echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xar
 # Use cases
 
 You can set up the DNS-PERSIST-01 record on a DNS server, and then you can call your friend on the other side of the globe, tell him your password, and then he can generate certificates.
+
 You can "pre-provision" a server with private keys and then use the same password to generate the certificate
+
 You can make a read-only "live media" server, that only requires the password at startup, and it will generate all private keys and fetch certificates automatically.
+
 No risk of losing private key - as long as you remember your password.
