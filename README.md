@@ -6,13 +6,13 @@ A stateless DNS-PERSIST-01 ACME client in different languages with cross-compati
 Requirements: Net::ACME2, Net::ACME2::LetsEncrypt, Digest::SHA, Crypt::Perl::ECDSA, Crypt::Perl::ECDSA::Parse, Crypt::Perl::PKCS10, Crypt::PK::ECC
 
 Generate certificate
-./ACME.pl <secret password> <file to write certificate to> <domain1> <domain2> <domain3> and so on...
+./ACME.pl [secret password] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
 
 Export private key
-./ACME.pl <secret password> <file to write private key to> export
+./ACME.pl [secret password] [file to write private key to] export
 
 Get DNS-PERSIST-01 record
-./ACME.pl <secret password>
+./ACME.pl [secret password]
 
 # ACME.html usage:
 
@@ -24,10 +24,10 @@ Advantages: The client is totally client-side and does ONLY talk to lets encrypt
 # Key generation on a server - run the following command in console (can be done offline without network connection if you want and does not need root):
 
 Certificate private key:
-echo -n "<secret password>" | openssl dgst -sha384 -binary | xxd -p -c 48 | xargs -I {} printf "303e0201010430{}a00706052b81040022" | xxd -r -p | openssl ec -inform DER -conv_form uncompressed -out private_key.pem
+echo -n "[secret password]" | openssl dgst -sha384 -binary | xxd -p -c 48 | xargs -I {} printf "303e0201010430{}a00706052b81040022" | xxd -r -p | openssl ec -inform DER -conv_form uncompressed -out private_key.pem
 
 Account private key (for import in other ACME client):
-echo -n "<secret password>-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xargs -I {} printf "303e0201010430{}a00706052b81040022" | xxd -r -p | openssl ec -inform DER -conv_form uncompressed -out private_key.pem
+echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xargs -I {} printf "303e0201010430{}a00706052b81040022" | xxd -r -p | openssl ec -inform DER -conv_form uncompressed -out private_key.pem
 
 # Limitations (any changes outside of these limitations will NOT be accepted)
 
