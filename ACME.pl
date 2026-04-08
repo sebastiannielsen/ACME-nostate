@@ -57,7 +57,7 @@ if (length($ARGV[2]) > 4) {
                 $fdauth = $acme->get_authorization( $dauth );
                 foreach $chtype ($fdauth->challenges()) {
                         if ($chtype->type() eq "dns-persist-01") {
-                                $chall = Net::ACME2::Challenge->new(url => $chtype->url(), type => $chtype->type(), token => "", status => $chtype->status(), validated =>>
+                                $chall = Net::ACME2::Challenge->new(url => $chtype->url(), type => $chtype->type(), token => "", status => $chtype->status(), validated => $chtype->validated() );
                                 $acme->accept_challenge($chall);
                         }
                 }
@@ -67,7 +67,7 @@ if (length($ARGV[2]) > 4) {
             sleep 2;
             $acme->poll_order($order);
             if ($order->status() eq 'invalid') {
-              print "Failed validation for one or more domains. Please ensure you have set up the correct records, that you have entered the correct password correspondin>
+              print "Failed validation for one or more domains. Please ensure you have set up the correct records, that you have entered the correct password corresponding to your _validation-persist record, and that your CAA records are set up properly, and that you have not forgot the policy=wildcard addition to the DNS-PERSIST-01 record.\n";
               exit;
            }
         }
