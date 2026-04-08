@@ -40,7 +40,7 @@ Account private key (for import in other ACME client):
 
 echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xargs -I {} printf "303e0201010430{}a00706052b81040022" | xxd -r -p | openssl ec -inform DER -conv_form uncompressed -out private_key.pem
 
-# Limitations (any changes outside of these limitations will NOT be accepted)
+# Limitations (any changes against limitations will NOT be accepted):
 
 - Does ONLY support DNS-PERSIST-01 - this because the client has no state and cannot remember orders or authorizations "across runs". DNS-PERSIST-01 can be validated in one "swoop" without having to pause the execution.
 - Does ONLY support secp384r1 keys - this to make stateless key generation possible.
@@ -48,7 +48,7 @@ echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xar
 - Does NOT support ARI or similiar protocols - due to the stateless nature.
 - For now: Does ONLY support staging - this will be updated once Let's Encrypt release DNS-PERSIST-01
 
-# Use cases
+# Use cases:
 
 You can set up the DNS-PERSIST-01 record on a DNS server, and then you can call your friend on the other side of the globe, tell him your password, and then he can generate certificates.
 
