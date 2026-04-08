@@ -16,6 +16,8 @@ document.getElementById("txtrecord").innerHTML = '<font color="red"><pre>Passwor
 return;
 }
 
+document.getElementById("pemcert").value = "";
+
 const hashArray = new Uint8Array(await window.crypto.subtle.digest("SHA-384",new TextEncoder().encode(document.getElementById("password").value)));
 const header = new Uint8Array([0x30, 0x4e,0x02, 0x01, 0x00,0x30, 0x10,0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,0x04, 0x37,0x30, 0x35,0x02, 0x01, 0x01,0x04, 0x30]);
 
@@ -106,6 +108,15 @@ createaccount.signature = btoa(String.fromCharCode(...new Uint8Array(await windo
 document.getElementById("gencrt").innerHTML = "Generating... [##____]"
 
 response = await fetch(newacct, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(createaccount)});
+
+if (response.status > 399) {
+document.getElementById("txtrecord").innerHTML = '<font color="red"><pre>Invalid password (account could not be created)</pre></font>';
+document.getElementById("gencrt").disabled = false;
+document.getElementById("genpriv").disabled = false;
+document.getElementById("gencrt").innerHTML = "Generate certificate";
+return;
+}
+
 nonce = response.headers.get("Replay-Nonce");
 accounturi = response.headers.get("Location");
 document.getElementById("txtrecord").innerHTML = '<pre>_validation-persist.YOURDOMAIN.TLD IN TXT "' + cadomain + ';accounturi=' + accounturi + ';policy=wildcard"</pre>';
@@ -121,6 +132,8 @@ document.getElementById("gencrt").innerHTML = "Generate certificate";
 }
 
 if (domains.length > 4) {
+
+document.getElementById("pemcert").value = "";
 
 let domainarray = [];
 let autharray = [];
@@ -155,6 +168,15 @@ createorder.payload =  btoa(payloadstring).replace(/\+/g, '-').replace(/\//g, '_
 createorder.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},CryptKey, new TextEncoder().encode(createorder.protected + "." + createorder.payload))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 response = await fetch(neworder, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(createorder)});
+
+if (response.status > 399) {
+document.getElementById("pemcert").value = "Order cannot be created - propably blacklisted domains in order or ratelimit hit.";
+document.getElementById("gencrt").disabled = false;
+document.getElementById("genpriv").disabled = false;
+document.getElementById("gencrt").innerHTML = "Generate certificate";
+return;
+}
+
 nonce = response.headers.get("Replay-Nonce");
 orderurl = response.headers.get("Location");
 
@@ -264,28 +286,26 @@ let versionheader = "020100";
 
 if (sans.includes(",")) {
 newdomains = sans.split(",");
-newdomains.forEach(function (item, index) { const wclength = item.length + 2; sansobject = sansobject + "82" + item.length.toString(16).padStart(2, '0') + asn_createhex(item) + "82" + wclength.toString(16).padStart(2, '0') + asn_createhex("*." + item); sanlength = sanlength + (item.length * 2) + 6;});
+newdomains.forEach(function (item, index) { sansobject = sansobject + "82" + asn1len(item.length * 2) + asn_createhex(item) + "82" + asn1len(item.length * 2 + 4) + asn_createhex("*." + item);});
 dn = asn_createhex(newdomains[0]);
 }
 else
 {
-let wclength = sans.length + 2;
-sansobject = "82" + sans.length.toString(16).padStart(2, '0') + asn_createhex(sans) + "82" + wclength.toString(16).padStart(2, '0') + asn_createhex("*." + sans);
-sanlength = (sans.length * 2) + 6;
+sansobject = "82" + asn1len(sans.length * 2) + asn_createhex(sans) + "82" + asn1len(sans.length * 2 + 4) + asn_createhex("*." + sans);
 dn = asn_createhex(sans);
 }
-sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
-sansobject = "0603551d1104" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
-sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
-sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
-sansobject = "06092a864886f70d01090e31" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
-sansobject = "30" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
-sansobject = "a0" + (sansobject.length / 2).toString(16).padStart(2, '0') + sansobject;
+sansobject = "30" + asn1len(sansobject.length) + sansobject;
+sansobject = "0603551d1104" + asn1len(sansobject.length) + sansobject;
+sansobject = "30" + asn1len(sansobject.length) + sansobject;
+sansobject = "30" + asn1len(sansobject.length) + sansobject;
+sansobject = "06092a864886f70d01090e31" + asn1len(sansobject.length) + sansobject;
+sansobject = "30" + asn1len(sansobject.length) + sansobject;
+sansobject = "a0" + asn1len(sansobject.length) + sansobject;
 
-dn = "06035504030c" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
-dn = "30" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
-dn = "31" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
-dn = "30" + (dn.length / 2).toString(16).padStart(2, '0') + dn;
+dn = "06035504030c" + asn1len(dn.length) + dn;
+dn = "30" + asn1len(dn.length) + dn;
+dn = "31" + asn1len(dn.length) + dn;
+dn = "30" + asn1len(dn.length) + dn;
 
 privkeydata = await window.crypto.subtle.exportKey("jwk", certkey);
 delete privkeydata.d
@@ -295,16 +315,7 @@ spki = asn_createhex(String.fromCharCode.apply(null, new Uint8Array(await window
 
 
 asn1builder = versionheader + dn + spki + sansobject;
-
-if (asn1builder.length > 511) {
-const secondbyte = Math.trunc(asn1builder.length / 512);
-const firstbyte = (asn1builder.length / 2) % 256;
-asn1builder = "3082" + secondbyte.toString(16).padStart(2, '0') + firstbyte.toString(16).padStart(2, '0') + asn1builder
-}
-else
-{
-asn1builder = "3081" + (asn1builder.length / 2).toString(16).padStart(2, '0') + asn1builder
-}
+asn1builder = "30" + asn1len(asn1builder.length) + asn1builder
 
 const signdata = asn_createhex(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},certkey, arraybuffertosign(asn1builder) ))) );
 
@@ -317,16 +328,13 @@ if (parseInt(sint.substring(0, 2), 16) >= 0x80) {
 sint = "00" + sint;
 }
 
-rint = "02" + (rint.length / 2).toString(16).padStart(2, '0') + rint;
-sint = "02" + (sint.length / 2).toString(16).padStart(2, '0') + sint;
-let asn1signdata = "0030" + ((rint.length + sint.length) / 2).toString(16).padStart(2, '0') + rint + sint;
-asn1signdata = "300a06082a8648ce3d04030303" + (asn1signdata.length / 2).toString(16).padStart(2, '0') + asn1signdata;
+rint = "02" + asn1len(rint.length) + rint;
+sint = "02" + asn1len(sint.length) + sint;
+let asn1signdata = "0030" + asn1len(rint.length + sint.length) + rint + sint;
+asn1signdata = "300a06082a8648ce3d04030303" + asn1len(asn1signdata.length) + asn1signdata;
 
 let signeddata = asn1builder + asn1signdata;
-
-const signsecondbyte = Math.trunc(signeddata.length / 512);
-const signfirstbyte = (signeddata.length / 2) % 256;
-const alldata = "3082" + signsecondbyte.toString(16).padStart(2, '0') + signfirstbyte.toString(16).padStart(2, '0') + signeddata;
+const alldata = "30" + asn1len(signeddata.length) + signeddata;
 
 return alldata;
 }
@@ -342,6 +350,16 @@ hexarr.push(str.charCodeAt(i).toString(16).padStart(2, '0'));
 return hexarr.join('');
 }
 
+function asn1len(len) {
+if (len <= 254) {
+return (len / 2).toString(16).padStart(2, '0');
+}
+let hx = (len / 2).toString(16);
+if (hx.length % 2 !== 0) hx = "0" + hx;
+const numlen = hx.length / 2;
+const first = (128 + numlen).toString(16);
+return first + hx;
+}
 
 function arraybuffertosign(input) {
     var pairs = input.match(/[\dA-F]{2}/gi);
@@ -355,7 +373,7 @@ function arraybuffertosign(input) {
 </head>
 <body>
 <h2>Password: <input style="font-size: 25" type="password" id="password"></h2>
-<h2>Domains: <input style="font-size: 25" type="text" id="domain" maxlength="41"> (Comma-separated, max 42 characters)</h2>
+<h2>Domains: <input style="font-size: 25" type="text" id="domain"> (Comma-separated)</h2>
 <h2>Leave "Domains" blank + "Generate certificate" if you just want to get your DNS-PERSIST-01 record.</h2>
 <h2>Leave "Domains" blank + "Generate private key + CSR" for just the private key (NO CSR).</h2>
 <button id="gencrt" style="font-size: 25">Generate certificate</button> <button id="genpriv" style="font-size: 25">Generate private key + CSR</button><br>
