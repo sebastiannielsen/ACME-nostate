@@ -38,11 +38,10 @@ echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xar
 
 # Limitations (any changes outside of these limitations will NOT be accepted)
 
-- Does ONLY support DNS-PERSIST-01 - this to make the client really portable.
+- Does ONLY support DNS-PERSIST-01 - this because the client has no state and cannot remember orders or authorizations "across runs". DNS-PERSIST-01 can be validated in one "swoop" without having to pause the execution.
 - Does ONLY support secp384r1 keys - this to make stateless key generation possible.
 - Does ONLY support wildcard generation - this to make code easier.
-- Does NOT support ARI or similiar protocols
-
+- Does NOT support ARI or similiar protocols - due to the stateless nature.
 - For now: Does ONLY support staging - this will be updated once Let's Encrypt release DNS-PERSIST-01
 
 # Use cases
