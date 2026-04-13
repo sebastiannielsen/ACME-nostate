@@ -1,6 +1,7 @@
 <html>
 <head>
 <meta name="referrer" content="no-referrer">
+<link rel="icon" href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAD3ElEQVR4AeyWTW4aQRCFq4eDZHyAnCHjjY0tRcJSFHtnOETWwBmirCE7OxuzcAy2EhkfIEeIPDlALmDZdN7X0COGwDD5kbLJqB9dXVVd/bqqe5jEfuFp3Zy0W5PjAVNa45P06PrYA8lZ0MnWun7dRa6L2gS0SOq8H5jzOcFdQzKC4BI/wG6Ju3PmelLVbrUJaGF2lo/2P/TJhHnL/MztgrBaMjsd7Z0NL/bPXRjX/KlFgN05Z21vfkjceSZsOjo4C0DvtHP8sMceeRtqESjtflFj/+Q6xUKz5L0Wyk1ZUG/0Ohv3Qd7yU4vAqHneUWp3WNBpp9pxT7vPOQcshCzdEBs+NieU1jmQWwmEesddzHdYOgcyhYU4G5IDqUDIuY6I3ElX2SoJsINQb4VgZ+yQnWqoqviuem5ELn0be7B5yyDNgRSRqXwq20YCBFTgnoL2iEC61c93Pz8HqW5AR9iVPhWjbpEF77vMl96Obo5vo8x4FRsJLBa0UfnahYMXiHkbskMh90q3Syw1PQtCxkHU0HRd0xgrjFd+1hIQ40wTMwLjH8rgbKrFpjEYBxMbIN3ciiAfnOXe29TpsCpOqhh9YlEWW/OsJSD2L4wF9WLhHDCPBRQwI5iCdtARNMIa89ozjtlQnFPIEcuZP2XOKtYSIO0Xe+e7WjBlJ958uHZahDTnBJUtIzPrAEkW0tw2PbEA8irWEiicnO9KziGk3uzJprwPkCmH6r2zBRxQ3DeikoBzxr9cShlIrTIQrhgyYLwNyhRZs01PJQGlnnc/97y3LtV1dIHgptWlryRA6km54H4XnBets7FVEoizSHcog15ARa8PEuykGDsyKOz6eGG8DbUImJ8940QvQ4HntdX1s5l/obFBxjmXOXPtqENfhVoElkqxo1IEcAsITIrjS0m6nOuGT9ThU4VaBKoC/KntP4F/n4HDw8P2MprN5vx0L4q7bIvysg9y1K/rsS9CGfKqDxkYyKFAkiS3OEpnci70GhcyPhqHpmtX6KX4SV7YZTLTvHsJJR8I9Gaz2Q6QsSeUMqAxrYMdeO9Ln1laIEWHTY7MV2fDxZhPNsYFoi92IFLJ3WQyyYG8vgmrLb+6uhpiBwrAt0B/2UkkptgULHyEKnCfsXxKZDU2+abyywrIeUCqgRxIj7rNjcAQ2uyx1UKGWSeAEph2RRoxbJ39FxyG2oCLUCaSzng83gUKTnrVlVpKdoRuRDykJa/6g0xxyHqIl1xeXhZ1enx8/KxsvCXNxFN5rtV/EZ4LLyMajcYryaGppu805xODh4eHr+pHy/O1w4/ShSbfNxK+C0W8HwAAAP//bHAuLgAAAAZJREFUAwDKAab7fGI/wAAAAABJRU5ErkJggg==">
 <title>Client-Side DNS-PERSIST-01 ACME2 Client</title>
 <script>
 document.addEventListener('DOMContentLoaded', () => { 
@@ -67,7 +68,7 @@ if (staging == 1) { ServerURL = "https://acme-staging-v02.api.letsencrypt.org/di
 
 document.getElementById("gencrt").disabled = true;
 document.getElementById("genpriv").disabled = true;
-document.getElementById("gencrt").innerHTML = "Generating... [_______]"
+document.getElementById("gencrt").innerHTML = "Generating... [________]"
 
 response = await fetch(ServerURL);
 
@@ -78,7 +79,7 @@ const newnonce = directoryobject.newNonce;
 const newacct = directoryobject.newAccount;
 const neworder = directoryobject.newOrder;
 
-document.getElementById("gencrt").innerHTML = "Generating... [#______]"
+document.getElementById("gencrt").innerHTML = "Generating... [#_______]"
 
 response = await fetch(newnonce);
 nonce = response.headers.get("Replay-Nonce");
@@ -105,7 +106,7 @@ createaccount.payload = "eyJ0ZXJtc09mU2VydmljZUFncmVlZCI6IHRydWV9";
 createaccount.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},CryptKey, new TextEncoder().encode(createaccount.protected + "." + createaccount.payload))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
 
-document.getElementById("gencrt").innerHTML = "Generating... [##_____]"
+document.getElementById("gencrt").innerHTML = "Generating... [##______]"
 
 response = await fetch(newacct, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(createaccount)});
 
@@ -163,6 +164,8 @@ domainarray.forEach(function (item, index) { payloadstring = payloadstring + ite
 payloadstring = payloadstring.substring(0, payloadstring.length - 1);
 payloadstring = payloadstring + "]}";
 
+document.getElementById("gencrt").innerHTML = "Generating... [###____]"
+  
 createorder.protected = btoa('{"alg": "ES384", "kid": "' + accounturi + '", "nonce": "' + nonce + '", "url": "' + neworder + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 createorder.payload =  btoa(payloadstring).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 createorder.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},CryptKey, new TextEncoder().encode(createorder.protected + "." + createorder.payload))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -184,12 +187,12 @@ const authz = await response.json();
 autharray = authz.authorizations;
 const finalizeurl = authz.finalize;
 
-document.getElementById("gencrt").innerHTML = "Generating... [###____]"
+document.getElementById("gencrt").innerHTML = "Generating... [####____]"
 
 for (const item of autharray) {
 nonce = await doauth(item, accounturi, nonce, CryptKey);
 }
-document.getElementById("gencrt").innerHTML = "Generating... [####___]"
+document.getElementById("gencrt").innerHTML = "Generating... [#####___]"
 let returnarray = [];
 const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, accounturi, nonce, CryptKey);nonce = returnarray[0]; if (returnarray[1] === 'invalid') {clearInterval(checkApiInterval);document.getElementById("gencrt").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";document.getElementById("pemcert").value = "Failed validation for one or more domains. Please ensure you have set up the correct records, that you have entered the correct password corresponding to your _validation-persist record, and that your CAA records are set up properly, and that you have not forgot the policy=wildcard addition to the DNS-PERSIST-01 record.";}; if (returnarray[1] === 'ready') {clearInterval(checkApiInterval);finalizeorder(finalizeurl, accounturi, nonce, CryptKey, orderurl);}} catch (error) {document.getElementById("gencrt").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";console.error("Fel vid anrop:", error);}}, 2500);
 }
@@ -199,7 +202,7 @@ const checkApiInterval = setInterval(async () => {try {returnarray = [];returnar
 
 async function finalizeorder(url, account, nonce, privatekey, orderurl) {
 
-document.getElementById("gencrt").innerHTML = "Generating... [#####__]"
+document.getElementById("gencrt").innerHTML = "Generating... [######__]"
 const hashArray = new Uint8Array(await window.crypto.subtle.digest("SHA-384",new TextEncoder().encode(document.getElementById("password").value)));
 const header = new Uint8Array([0x30, 0x4e,0x02, 0x01, 0x00,0x30, 0x10,0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,0x04, 0x37,0x30, 0x35,0x02, 0x01, 0x01,0x04, 0x30]);
 
@@ -217,7 +220,7 @@ finalize.signature = btoa(String.fromCharCode(...new Uint8Array(await window.cry
 
 let response = await fetch(url, {method: 'POST',headers: {'Content-Type': 'application/jose+json'},body: JSON.stringify(finalize)});
 nonce = response.headers.get("Replay-Nonce");
-document.getElementById("gencrt").innerHTML = "Generating... [######_]"
+document.getElementById("gencrt").innerHTML = "Generating... [#######_]"
 
 let returnarray = [];
 const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, account, nonce, privatekey);nonce = returnarray[0]; if (returnarray[1] === 'valid') {clearInterval(checkApiInterval);fetchcert(returnarray[2], account, nonce, privatekey);}} catch (error) {document.getElementById("gencrt").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";console.error("Fel vid anrop:", error);}}, 2500);
@@ -225,7 +228,7 @@ const checkApiInterval = setInterval(async () => {try {returnarray = [];returnar
 
 async function fetchcert(url, account, nonce, privatekey) {
 
-document.getElementById("gencrt").innerHTML = "Generating... [#######]"
+document.getElementById("gencrt").innerHTML = "Generating... [########]"
 let fetchcrt = {};
 fetchcrt.protected = btoa('{"alg": "ES384", "kid": "' + account + '", "nonce": "' + nonce + '", "url": "' + url + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 fetchcrt.payload = "";
