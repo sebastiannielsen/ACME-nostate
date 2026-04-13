@@ -164,7 +164,7 @@ domainarray.forEach(function (item, index) { payloadstring = payloadstring + ite
 payloadstring = payloadstring.substring(0, payloadstring.length - 1);
 payloadstring = payloadstring + "]}";
 
-document.getElementById("gencrt").innerHTML = "Generating... [###____]"
+document.getElementById("gencrt").innerHTML = "Generating... [###_____]"
   
 createorder.protected = btoa('{"alg": "ES384", "kid": "' + accounturi + '", "nonce": "' + nonce + '", "url": "' + neworder + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 createorder.payload =  btoa(payloadstring).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
