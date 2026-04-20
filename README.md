@@ -4,21 +4,28 @@ A stateless DNS-PERSIST-01 secp384r1 ACME client in different languages with cro
 # ACME.pl and ACME-nostate.exe usage:
 
 Requirements for ACME.pl: Net::ACME2, Net::ACME2::LetsEncrypt, Digest::SHA, Crypt::Perl::ECDSA, Crypt::Perl::ECDSA::Parse, Crypt::Perl::PKCS10, Crypt::PK::ECC
+
 Requirements for ACME-nostate.exe: .NET Framework 4.7.2
+
 
 Generate certificate
 
 ./ACME.pl [secret password] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
+
 ACME-nostate.exe [secret password] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
+
 
 Export private key
 
 ./ACME.pl [secret password] [file to write private key to] export
+
 ACME-nostate.exe [secret password] [file to write private key to] export
+
 
 Get DNS-PERSIST-01 record
 
 ./ACME.pl [secret password]
+
 ACME-nostate.exe [secret password]
 
 # ACME.html anc ACME-nostate.exe usage:
