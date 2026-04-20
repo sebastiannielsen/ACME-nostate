@@ -1,25 +1,29 @@
 # ACME-nostate
 A stateless DNS-PERSIST-01 secp384r1 ACME client in different languages with cross-compatibility, making it possible to easily request certificates across different platforms.
 
-# ACME.pl usage:
+# ACME.pl and ACME-nostate.exe usage:
 
-Requirements: Net::ACME2, Net::ACME2::LetsEncrypt, Digest::SHA, Crypt::Perl::ECDSA, Crypt::Perl::ECDSA::Parse, Crypt::Perl::PKCS10, Crypt::PK::ECC
+Requirements for ACME.pl: Net::ACME2, Net::ACME2::LetsEncrypt, Digest::SHA, Crypt::Perl::ECDSA, Crypt::Perl::ECDSA::Parse, Crypt::Perl::PKCS10, Crypt::PK::ECC
+Requirements for ACME-nostate.exe: .NET Framework 4.7.2
 
 Generate certificate
 
 ./ACME.pl [secret password] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
+ACME-nostate.exe [secret password] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
 
 Export private key
 
 ./ACME.pl [secret password] [file to write private key to] export
+ACME-nostate.exe [secret password] [file to write private key to] export
 
 Get DNS-PERSIST-01 record
 
 ./ACME.pl [secret password]
+ACME-nostate.exe [secret password]
 
-# ACME.html usage:
+# ACME.html anc ACME-nostate.exe usage:
 
-Just start it in web browser.
+Just start it in web browser or double click ACME-nostate.exe for GUI.
 
 Advantages: The client is totally client-side and does ONLY talk to lets encrypt server, meaning you do not have to trust any server.
 
