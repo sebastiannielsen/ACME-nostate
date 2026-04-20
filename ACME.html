@@ -70,7 +70,7 @@ document.getElementById("gencrt").disabled = true;
 document.getElementById("genpriv").disabled = true;
 document.getElementById("password").disabled = true;
 document.getElementById("domain").disabled = true;
-document.getElementById("pemcrt").disabled = true;
+document.getElementById("pemcert").disabled = true;
 document.getElementById("gencrt").innerHTML = "Generating... [________]"
 
 response = await fetch(ServerURL);
@@ -119,7 +119,7 @@ document.getElementById("gencrt").disabled = false;
 document.getElementById("genpriv").disabled = false;
 document.getElementById("password").disabled = false;
 document.getElementById("domain").disabled = false;
-document.getElementById("pemcrt").disabled = false;
+document.getElementById("pemcert").disabled = false;
 document.getElementById("gencrt").innerHTML = "Generate certificate";
 return;
 }
@@ -137,7 +137,7 @@ document.getElementById("gencrt").disabled = false;
 document.getElementById("genpriv").disabled = false;
 document.getElementById("password").disabled = false;
 document.getElementById("domain").disabled = false;
-document.getElementById("pemcrt").disabled = false;
+document.getElementById("pemcert").disabled = false;
 document.getElementById("gencrt").innerHTML = "Generate certificate";
 }
 
@@ -156,7 +156,7 @@ if (domains.includes("*")) {
   document.getElementById("genpriv").disabled = false;
   document.getElementById("password").disabled = false;
   document.getElementById("domain").disabled = false;
-  document.getElementById("pemcrt").disabled = false;
+  document.getElementById("pemcert").disabled = false;
   document.getElementById("gencrt").innerHTML = "Generate certificate";
   return;
 }
@@ -190,7 +190,7 @@ document.getElementById("gencrt").disabled = false;
 document.getElementById("genpriv").disabled = false;
 document.getElementById("password").disabled = false;
 document.getElementById("domain").disabled = false;
-document.getElementById("pemcrt").disabled = false;
+document.getElementById("pemcert").disabled = false;
 document.getElementById("gencrt").innerHTML = "Generate certificate";
 return;
 }
@@ -209,7 +209,7 @@ nonce = await doauth(item, accounturi, nonce, CryptKey);
 }
 document.getElementById("gencrt").innerHTML = "Generating... [#####___]"
 let returnarray = [];
-const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, accounturi, nonce, CryptKey);nonce = returnarray[0]; if (returnarray[1] === 'invalid') {clearInterval(checkApiInterval);document.getElementById("gencrt").disabled = false;document.getElementById("domain").disabled = false;document.getElementById("password").disabled = false;document.getElementById("pemcrt").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";document.getElementById("pemcert").value = "Failed validation for one or more domains. Please ensure you have set up the correct records, that you have entered the correct password corresponding to your _validation-persist record, and that your CAA records are set up properly, and that you have not forgot the policy=wildcard addition to the DNS-PERSIST-01 record.";}; if (returnarray[1] === 'ready') {clearInterval(checkApiInterval);finalizeorder(finalizeurl, accounturi, nonce, CryptKey, orderurl);}} catch (error) {document.getElementById("gencrt").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";console.error("Fel vid anrop:", error);}}, 2500);
+const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, accounturi, nonce, CryptKey);nonce = returnarray[0]; if (returnarray[1] === 'invalid') {clearInterval(checkApiInterval);document.getElementById("gencrt").disabled = false;document.getElementById("domain").disabled = false;document.getElementById("password").disabled = false;document.getElementById("pemcert").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";document.getElementById("pemcert").value = "Failed validation for one or more domains. Please ensure you have set up the correct records, that you have entered the correct password corresponding to your _validation-persist record, and that your CAA records are set up properly, and that you have not forgot the policy=wildcard addition to the DNS-PERSIST-01 record.";}; if (returnarray[1] === 'ready') {clearInterval(checkApiInterval);finalizeorder(finalizeurl, accounturi, nonce, CryptKey, orderurl);}} catch (error) {document.getElementById("gencrt").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";console.error("Fel vid anrop:", error);}}, 2500);
 }
 
 }
@@ -238,7 +238,7 @@ nonce = response.headers.get("Replay-Nonce");
 document.getElementById("gencrt").innerHTML = "Generating... [#######_]"
 
 let returnarray = [];
-const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, account, nonce, privatekey);nonce = returnarray[0]; if (returnarray[1] === 'valid') {clearInterval(checkApiInterval);fetchcert(returnarray[2], account, nonce, privatekey);}} catch (error) {document.getElementById("gencrt").disabled = false;document.getElementById("domain").disabled = false;document.getElementById("password").disabled = false;document.getElementById("pemcrt").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";console.error("Fel vid anrop:", error);}}, 2500);
+const checkApiInterval = setInterval(async () => {try {returnarray = [];returnarray = await checkorder(orderurl, account, nonce, privatekey);nonce = returnarray[0]; if (returnarray[1] === 'valid') {clearInterval(checkApiInterval);fetchcert(returnarray[2], account, nonce, privatekey);}} catch (error) {document.getElementById("gencrt").disabled = false;document.getElementById("domain").disabled = false;document.getElementById("password").disabled = false;document.getElementById("pemcert").disabled = false;document.getElementById("genpriv").disabled = false;document.getElementById("gencrt").innerHTML = "Generate certificate";console.error("Fel vid anrop:", error);}}, 2500);
 }
 
 async function fetchcert(url, account, nonce, privatekey) {
@@ -255,7 +255,7 @@ document.getElementById("pemcert").value = await response.text();
   document.getElementById("genpriv").disabled = false;
   document.getElementById("password").disabled = false;
   document.getElementById("domain").disabled = false;
-  document.getElementById("pemcrt").disabled = false;
+  document.getElementById("pemcert").disabled = false;
   document.getElementById("gencrt").innerHTML = "Generate certificate";
 }
 
