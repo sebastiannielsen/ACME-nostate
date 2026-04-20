@@ -28,7 +28,7 @@ Get DNS-PERSIST-01 record
 
 ACME-nostate.exe [secret password]
 
-# ACME.html anc ACME-nostate.exe usage:
+# ACME.html and ACME-nostate.exe usage:
 
 Just start it in web browser or double click ACME-nostate.exe for GUI.
 
