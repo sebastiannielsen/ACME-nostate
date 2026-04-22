@@ -59,6 +59,8 @@ Public Class Form1
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles Me.Load
         Button3.Text = ChrW(&HE105) & " Save"
+        lastcertificate = ""
+        lastpassword = ""
     End Sub
 
     Private Sub Button3_Click(sender As Object, e As EventArgs) Handles Button3.Click
