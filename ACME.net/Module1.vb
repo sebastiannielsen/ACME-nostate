@@ -396,7 +396,6 @@ Module Module1
 
     <DataContract>
     Public Class ACMEAuthorization
-        <DataMember(Name:="status")> Public Property Status As String
         <DataMember(Name:="challenges")> Public Property Challenges As ACMEChallenges()
     End Class
 
