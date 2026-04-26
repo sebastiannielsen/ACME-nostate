@@ -46,9 +46,6 @@ import org.bouncycastle.asn1.x509.GeneralNames
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.spec.ECNamedCurveSpec
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder
-import org.bouncycastle.util.io.pem.PemObject
-import org.bouncycastle.util.io.pem.PemWriter
-import java.io.StringWriter
 import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
@@ -62,24 +59,20 @@ import java.security.spec.ECPublicKeySpec
 import java.util.Base64
 import java.security.PublicKey
 import kotlinx.serialization.Serializable
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
-import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import retrofit2.Retrofit
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Body
-import retrofit2.http.Path
 import retrofit2.http.Url
 import org.bouncycastle.operator.ContentSigner
-import org.bouncycastle.crypto.signers.ECDSASigner
-import org.bouncycastle.crypto.signers.HMacDSAKCalculator
-import org.bouncycastle.crypto.digests.SHA384Digest
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.asn1.x9.X9ObjectIdentifiers
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import android.os.Build
+import android.util.Log
+import androidx.annotation.Keep
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -88,53 +81,93 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
+import java.security.interfaces.ECPrivateKey
+import java.security.interfaces.ECPublicKey
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSObject
+import com.nimbusds.jose.Payload
+import com.nimbusds.jose.crypto.ECDSASigner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nimbusds.jose.shaded.gson.annotations.SerializedName
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.ResponseBody
+import retrofit2.Response
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Headers
 
+@Keep
 @Serializable
 data class Directory(
-    val newNonce: String,
-    val newAccount: String,
-    val newOrder: String,
-    val meta: Meta
+    @SerializedName("newNonce") val newNonce: String,
+    @SerializedName("newAccount") val newAccount: String,
+    @SerializedName("newOrder") val newOrder: String,
+    @SerializedName("meta") val meta: Meta
 )
 
+@Keep
 @Serializable
 data class Meta(
-    val caaIdentities: List<String>
+    @SerializedName("caaIdentities") val caaIdentities: List<String>
 )
 
+@Keep
 @Serializable
 data class Order(
-    val status: String,
-    val authorizations: List<String>,
-    val finalize: String,
-    val certificate: String?
+    @SerializedName("status") val status: String,
+    @SerializedName("authorizations") val authorizations: List<String>,
+    @SerializedName("finalize") val finalize: String,
+    @SerializedName("certificate") val certificate: String?
 )
 
+@Keep
 @Serializable
 data class Autz(
-    val challenges: List<Chal>
+    @SerializedName("challenges") val challenges: List<Chal>
 )
 
+@Keep
 @Serializable
 data class Chal(
-    val url: String,
-    val type: String
+    @SerializedName("url") val url: String,
+    @SerializedName("type") val type: String
 )
 
-
+@Keep
 interface AcmeApi {
     @GET("directory")
     suspend fun getDirectory(): Directory
 
-    @GET
-    suspend fun getOrder(@Url url: String): Order
+    @Headers("Content-Type: application/jose+json")
+    @POST
+    suspend fun getOrder(@Url url: String, @Body body: RequestBody): Response<Order>
+
+    @Headers("Content-Type: application/jose+json")
+    @POST
+    suspend fun getAutz(@Url url: String, @Body body: RequestBody): Response<Autz>
 
     @GET
-    suspend fun getAutz(@Url url: String): Autz
+    suspend fun blankGet(@Url url: String): Response<Void>
+
+    @Headers("Content-Type: application/jose+json")
+    @POST
+    suspend fun blankPost(@Url url: String, @Body body: RequestBody): Response<Void>
+
+    @Headers("Content-Type: application/jose+json")
+    @POST
+    suspend fun fetchcertificate(@Url url: String, @Body body: RequestBody): Response<ResponseBody>
 }
 
 
@@ -151,6 +184,8 @@ private val LightColorScheme = lightColorScheme(
     tertiary = Color(0xFF7D5260)
 )
 
+private var staging = 1
+private var nonce: String = ""
 
 @Composable
 fun AcmenostateTheme(
@@ -199,7 +234,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AcmeForm(modifier: Modifier = Modifier) {
+fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = viewModel()) {
+    val netrequest: CreateNetworkThread = viewModel()
+    val progress = viewModel.progress
+    val isRunning = progress > 0
+    val bgjob = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val domains = rememberTextFieldState()
     var format by remember { mutableStateOf("PEM") }
@@ -216,7 +255,7 @@ fun AcmeForm(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        SecureTextField(
+        SecureTextField(enabled = !isRunning,
             state = passwordState,
             label = { Text("Password") },
             textObfuscationMode = if (showPassword) {
@@ -226,7 +265,7 @@ fun AcmeForm(modifier: Modifier = Modifier) {
             },
             modifier = Modifier.fillMaxWidth(),
             trailingIcon = {
-                IconButton(onClick = { showPassword = !showPassword }) {
+                IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword }) {
                     Icon(
                         imageVector = if (showPassword) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                         contentDescription = if (showPassword) "Hide password" else "Show password"
@@ -235,16 +274,17 @@ fun AcmeForm(modifier: Modifier = Modifier) {
             }
         )
         TextField(
+            enabled = !isRunning,
             state = domains,
             label = { Text("Domains") },
             modifier = Modifier.fillMaxWidth()
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = (format == "PEM"), onClick = { format = "PEM" })
+            RadioButton(enabled = !isRunning, selected = (format == "PEM"), onClick = { format = "PEM" })
             Text("PEM-format", modifier = Modifier.padding(end = 16.dp))
 
-            RadioButton(selected = (format == "JWK"), onClick = { format = "JWK" })
+            RadioButton(enabled = !isRunning, selected = (format == "JWK"), onClick = { format = "JWK" })
             Text("JWK-format")
         }
 
@@ -252,17 +292,25 @@ fun AcmeForm(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = { keyboardController?.hide()
-                val (fullcert, fulldomain) = genCertificate(passwordState.text.toString(), domains.text.toString())
-                certState.edit { replace(0, length, fullcert) }
-                domainState.edit { replace(0, length, fulldomain) }}, modifier = Modifier.weight(1f)) {
-                Text("Generate DNS\n and Certificate", textAlign = TextAlign.Center)
+            Button(enabled = !isRunning, onClick = { keyboardController?.hide()
+                bgjob.launch {
+                    val (fullcert, fulldomain) = netrequest.genCertificate(
+                        passwordState.text.toString(),
+                        domains.text.toString()
+                    )
+                    certState.edit { replace(0, length, fullcert) }
+                    domainState.edit { replace(0, length, fulldomain) }
+
+                }
+                             }, modifier = Modifier.weight(1f)) {
+                Text(if (progress == 0) { "Generate DNS\n and Certificate" } else { "Generating...\n[" + "#".repeat(progress) + "_".repeat(9 - progress) + "]" }, textAlign = TextAlign.Center)
             }
-                Button(onClick = {
+
+                Button(enabled = !isRunning, onClick = {
                     keyboardController?.hide()
                     val (fullcert, fulldomain) = genKey(
                         passwordState.text.toString(),
-                        domains.text.toString()
+                        domains.text.toString(), format
                     )
                     certState.edit { replace(0, length, fullcert) }
                     domainState.edit { replace(0, length, fulldomain) }
@@ -298,29 +346,199 @@ fun AcmeForm(modifier: Modifier = Modifier) {
     }
 }
 
-fun genCertificate(passwd: String, domains: String): Pair<String, String>  {
-    if (passwd.isEmpty()) {
-        return Pair("", "The password cannot be empty.")
+
+class CreateNetworkThread : ViewModel() {
+    var progress by mutableIntStateOf(0)
+    suspend fun genCertificate(passwd: String, domains: String): Pair<String, String> {
+        val acmeURL: String = if (staging == 1) {
+            "https://acme-staging-v02.api.letsencrypt.org"
+        } else {
+            "https://acme-v02.api.letsencrypt.org"
+        }
+
+        if (passwd.isEmpty()) {
+            return Pair("", "The password cannot be empty.")
+        }
+        progress = 1
+        val dgest = MessageDigest.getInstance("SHA-384")
+        val acctpassword = "$passwd-"
+        var accounturi: String
+        var caadomain: String
+        val hashBytes = dgest.digest(acctpassword.toByteArray(Charsets.UTF_8))
+        val algoParams = AlgorithmParameters.getInstance("EC")
+        algoParams.init(ECGenParameterSpec("secp384r1"))
+        val ecSpec = algoParams.getParameterSpec(ECParameterSpec::class.java)
+        val keypairprivate = ECPrivateKeySpec(BigInteger(1, hashBytes), ecSpec)
+        val kf = KeyFactory.getInstance("EC", "AndroidOpenSSL")
+        val ecPrivate = kf.generatePrivate(keypairprivate)
+        val retrofit = Retrofit.Builder().baseUrl(acmeURL).addConverterFactory(GsonConverterFactory.create()).build()
+        val api = retrofit.create(AcmeApi::class.java)
+            try {
+                val directory = api.getDirectory()
+                val objNonce = api.blankGet(directory.newNonce)
+                nonce = objNonce.headers()["Replay-Nonce"] ?: nonce
+                val objAcctCreate = api.blankPost(directory.newAccount, genJWK(directory.newAccount, ecPrivate, "{\"termsOfServiceAgreed\": true}", ""))
+                if (objAcctCreate.code() > 399) {
+                    progress = 0
+                    return Pair(
+                        "Invalid password",
+                        "Failed to access or create account - invalid password?"
+                    )
+                }
+                nonce = objAcctCreate.headers()["Replay-Nonce"] ?: nonce
+                accounturi = objAcctCreate.headers()["Location"] ?: ""
+                caadomain = directory.meta.caaIdentities[0]
+                if (domains.isEmpty()) {
+                    progress = 0
+                    return Pair(
+                        "Please add the above DNS record to your DNS, remembering to replace YOURDOMAIN.TLD with your domain",
+                        "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                    )
+                }
+                else
+                {
+                    progress = 2
+                    val listdomains = domains.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { listOf(it, "*.$it") }.distinct()
+                    val jsonorder = """{"identifiers": [${listdomains.joinToString(",") { """{"type": "dns", "value": "$it"}""" }}]}"""
+                    val order = api.getOrder(directory.newOrder, genJWK(directory.newOrder, ecPrivate, jsonorder, accounturi))
+                    if (order.code() > 399) {
+                        progress = 0
+                        return Pair(
+                            "Unable to create order - did you request certificate for a blacklisted domain?",
+                            "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                        )
+                    }
+                    nonce = order.headers()["Replay-Nonce"] ?: nonce
+                    val orderuri = order.headers()["Location"] ?: ""
+                    for (auth in order.body()!!.authorizations) {
+                        progress = 3
+                        val autz = api.getAutz(auth, genJWK(auth, ecPrivate, "", accounturi ))
+                        nonce = autz.headers()["Replay-Nonce"] ?: nonce
+                        for (chal in autz.body()!!.challenges) {
+                        if (chal.type == "dns-persist-01") {
+                          val blpost = api.blankPost(chal.url, genJWK(chal.url, ecPrivate, "{}", accounturi))
+                            nonce = blpost.headers()["Replay-Nonce"] ?: nonce
+                            break
+                        }
+                        }
+                    }
+                    progress = 4
+                    var ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
+                    nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
+                    while (true) {
+                        progress = 5
+                        delay(1000)
+                        ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
+                        nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
+                        if (ordercheck.body()!!.status == "invalid") {
+                            progress = 0
+                            return Pair(
+                                "Error validating domains, you have not published the DNS records yet!",
+                                "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                            )
+                        }
+                        if (ordercheck.body()!!.status == "ready") {
+                            break
+                        }
+                    }
+                    progress = 6
+                    val hbb = dgest.digest(passwd.toByteArray(Charsets.UTF_8))
+                    val kpp = ECPrivateKeySpec(BigInteger(1, hbb), ecSpec)
+                    val kfp = KeyFactory.getInstance("EC", "AndroidOpenSSL")
+                    val crtprivate = kfp.generatePrivate(kpp)
+                    val csrjson = "{\"csr\": \"" + android.util.Base64.encodeToString(genCSR(crtprivate, domains), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING) + "\"}"
+                    val csrresponse = api.blankPost(ordercheck.body()!!.finalize, genJWK(ordercheck.body()!!.finalize, ecPrivate, csrjson , accounturi))
+                    if (csrresponse.code() > 399) {
+                        progress = 0
+                        return Pair(
+                            "Unable to submit CSR - something in the CSR is wierd?",
+                            "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                        )
+                    }
+                    nonce = csrresponse.headers()["Replay-Nonce"] ?: nonce
+                    progress = 7
+                    ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
+                    nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
+                    while (true) {
+                        progress = 8
+                        delay(1000)
+                        Log.d("ACME_DEBUG", ordercheck.body()!!.status)
+                        ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
+                        nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
+                        if (ordercheck.body()!!.status == "invalid") {
+                            return Pair(
+                                "Error submitting CSR!",
+                                "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                            )
+                        }
+                        if (ordercheck.body()!!.status == "valid") {
+                            break
+                        }
+                    }
+                    progress = 9
+                    val pemcertificate = api.fetchcertificate(ordercheck.body()!!.certificate!!, genJWK(ordercheck.body()!!.certificate!!, ecPrivate, "", accounturi))
+                    progress = 0
+                    return Pair(
+                        pemcertificate.body()!!.string(),
+                        "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                    )
+
+                }
+            } catch (e: Exception) {
+                progress = 0
+                e.printStackTrace()
+            }
+
+        progress = 0
+        return Pair("", "")
     }
-    val dgest = MessageDigest.getInstance("SHA-384")
-    val acctpassword = "$passwd-"
-    val hashBytes = dgest.digest(acctpassword.toByteArray(Charsets.UTF_8))
-    val algoParams = AlgorithmParameters.getInstance("EC")
-    algoParams.init(ECGenParameterSpec("secp384r1"))
-    val ecSpec = algoParams.getParameterSpec(ECParameterSpec::class.java)
-    val keypairprivate = ECPrivateKeySpec(BigInteger(1, hashBytes), ecSpec )
-    val kf = KeyFactory.getInstance("EC", "AndroidOpenSSL")
-    val ecPrivate = kf.generatePrivate(keypairprivate)
-    val ecPublic = getPublicKey(ecPrivate)
-
-
-return Pair("","")
 }
 
-fun genKey(passwd: String, domains: String): Pair<String, String> {
+fun genJWK(url: String, privkey: PrivateKey, payload: String, accounturi: String): RequestBody {
+    var header: JWSHeader
+    val jwk = ECKey.Builder(Curve.P_384, getPublicKey(privkey) as ECPublicKey)
+        .privateKey(privkey as ECPrivateKey)
+        .build()
+    val jwkFullJson = jwk.toPublicJWK()
+
+    if (accounturi.isNotEmpty()) {
+        header = JWSHeader.Builder(JWSAlgorithm.ES384)
+            .customParam("nonce", nonce)
+            .customParam("url", url)
+            .keyID(accounturi)
+            .build()
+    } else {
+        header = JWSHeader.Builder(JWSAlgorithm.ES384)
+            .customParam("nonce", nonce)
+            .customParam("url", url)
+            .jwk(jwkFullJson)
+            .build()
+    }
+
+    val payload = Payload(payload)
+    val jwsObject = JWSObject(header, payload)
+    val signer = ECDSASigner(jwk)
+    jwsObject.sign(signer)
+
+    val acmeRequestBody = """
+{
+  "protected": "${jwsObject.header.toBase64URL()}",
+  "payload": "${jwsObject.payload.toBase64URL()}",
+  "signature": "${jwsObject.signature}"
+}
+""".trimIndent()
+
+return acmeRequestBody.toRequestBody("application/jose+json".toMediaType())
+}
+
+
+
+
+fun genKey(passwd: String, domains: String, format: String): Pair<String, String> {
     if (passwd.isEmpty()) {
         return Pair("", "The password cannot be empty.")
     }
+    var certState: String
     val dgest = MessageDigest.getInstance("SHA-384")
     val hashBytes = dgest.digest(passwd.toByteArray(Charsets.UTF_8))
     val algoParams = AlgorithmParameters.getInstance("EC")
@@ -329,18 +547,27 @@ fun genKey(passwd: String, domains: String): Pair<String, String> {
     val keypairprivate = ECPrivateKeySpec(BigInteger(1, hashBytes), ecSpec )
     val kf = KeyFactory.getInstance("EC", "AndroidOpenSSL")
     val eCPrivate = kf.generatePrivate(keypairprivate)
-    val certState: String = if (domains.length < 4) {
-        "-----BEGIN PRIVATE KEY-----\n" + Base64.getEncoder().encodeToString(eCPrivate.encoded).chunked(64).joinToString("\n") + "\n-----END PRIVATE KEY-----"
+    if (format == "JWK") {
+        certState = ECKey.Builder(Curve.P_384, getPublicKey(eCPrivate) as ECPublicKey).privateKey(eCPrivate as ECPrivateKey).build().toJSONString()
     }
-    else
-    {
-        "-----BEGIN PRIVATE KEY-----\n" + Base64.getEncoder().encodeToString(eCPrivate.encoded).chunked(64).joinToString("\n") + "\n-----END PRIVATE KEY-----\n\n" + genCSR(eCPrivate, domains)
+    else {
+        certState = if (domains.length < 4) {
+            "-----BEGIN PRIVATE KEY-----\n" + Base64.getEncoder().encodeToString(eCPrivate.encoded)
+                .chunked(64).joinToString("\n") + "\n-----END PRIVATE KEY-----"
+        } else {
+            "-----BEGIN PRIVATE KEY-----\n" + Base64.getEncoder().encodeToString(eCPrivate.encoded)
+                .chunked(64)
+                .joinToString("\n") + "\n-----END PRIVATE KEY-----\n\n-----BEGIN CERTIFICATE REQUEST-----\n" + Base64.getEncoder()
+                .encodeToString(genCSR(eCPrivate, domains)).chunked(64)
+                .joinToString("\n") + "\n-----END CERTIFICATE REQUEST-----"
+        }
     }
     return Pair(certState, "")
 }
 
-fun genCSR(privateKey: PrivateKey, domainString: String): String {
-    val domains = domainString.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { listOf(it, "*.$it") }.distinct()
+fun genCSR(privateKey: PrivateKey, domainString: String): ByteArray? {
+    val domains = domainString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        .flatMap { listOf(it, "*.$it") }.distinct()
     val mainDomain = domains.first()
     val entityName = X500Name("CN=$mainDomain")
     val csrBuilder = JcaPKCS10CertificationRequestBuilder(entityName, getPublicKey(privateKey))
@@ -352,31 +579,37 @@ fun genCSR(privateKey: PrivateKey, domainString: String): String {
 
     val signer = object : ContentSigner {
         private val outputStream = ByteArrayOutputStream()
-        private val bcParam = org.bouncycastle.jcajce.provider.asymmetric.util.ECUtil.generatePrivateKeyParameter(privateKey)
-        private val engine = ECDSASigner(HMacDSAKCalculator(SHA384Digest())).apply {
+
+        private val bcParam = org.bouncycastle.crypto.util.OpenSSHPrivateKeyUtil.encodePrivateKey(
+            org.bouncycastle.jcajce.provider.asymmetric.util.ECUtil.generatePrivateKeyParameter(privateKey)
+        ).let {
+            val encoded = privateKey.encoded ?: throw IllegalArgumentException("PrivateKey.encoded is null!")
+            org.bouncycastle.crypto.util.PrivateKeyFactory.createKey(encoded)
+        }
+
+        private val sigGen = org.bouncycastle.crypto.signers.DSADigestSigner(
+            org.bouncycastle.crypto.signers.ECDSASigner(org.bouncycastle.crypto.signers.HMacDSAKCalculator(org.bouncycastle.crypto.digests.SHA384Digest())),
+            org.bouncycastle.crypto.digests.SHA384Digest()
+        ).apply {
             init(true, bcParam)
         }
-        override fun getAlgorithmIdentifier(): AlgorithmIdentifier =
-            AlgorithmIdentifier(X9ObjectIdentifiers.ecdsa_with_SHA384)
+
+        override fun getAlgorithmIdentifier() = AlgorithmIdentifier(X9ObjectIdentifiers.ecdsa_with_SHA384)
         override fun getOutputStream(): OutputStream = outputStream
+
         override fun getSignature(): ByteArray {
-            val hash = ByteArray(SHA384Digest().digestSize)
-            val content = outputStream.toByteArray()
-            SHA384Digest().update(content, 0, content.size)
-            SHA384Digest().doFinal(hash, 0)
-            val sig = engine.generateSignature(hash)
-            return org.bouncycastle.asn1.DERSequence(arrayOf(
-                org.bouncycastle.asn1.ASN1Integer(sig[0]),
-                org.bouncycastle.asn1.ASN1Integer(sig[1])
-            )).encoded
+            val bytes = outputStream.toByteArray()
+            if (bytes.isEmpty()) throw IllegalStateException("No content to sign!")
+            sigGen.update(bytes, 0, bytes.size)
+            return sigGen.generateSignature()
         }
     }
 
     val csr = csrBuilder.build(signer)
-    val sw = StringWriter()
-    PemWriter(sw).use { it.writeObject(PemObject("CERTIFICATE REQUEST", csr.encoded)) }
-    return sw.toString()
+
+    return csr.encoded
 }
+
 fun getPublicKey(privateKey: PrivateKey): PublicKey {
     val kf = KeyFactory.getInstance("EC")
     val privSpec = kf.getKeySpec(privateKey, ECPrivateKeySpec::class.java)
