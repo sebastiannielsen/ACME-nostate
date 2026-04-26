@@ -28,13 +28,13 @@ Get DNS-PERSIST-01 record
 
 ACME-nostate.exe [secret password]
 
-# ACME.html and ACME-nostate.exe usage:
+# ACME.html, ACME-nostate.exe, ACME-nostate.apk usage:
 
-Just start it in web browser or double click ACME-nostate.exe for GUI.
+Just start it in web browser or double click ACME-nostate.exe or install ACME-nostate.apk on your phone for GUI.
 
 Advantages: The client is totally client-side and does ONLY talk to lets encrypt server, meaning you do not have to trust any server.
 
-You can also access the client here: https://sebastiannielsen.github.io/ACME-nostate/
+You can also access the javascript client here: https://sebastiannielsen.github.io/ACME-nostate/
 
 # Key generation on a server - run the following command in console:
 
