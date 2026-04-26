@@ -1,5 +1,6 @@
 package eu.sebbe.acme_nostate
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -83,6 +84,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -107,6 +109,8 @@ import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Headers
+import java.io.PrintWriter
+import java.io.StringWriter
 
 @Keep
 @Serializable
@@ -247,7 +251,127 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
     val certState = rememberTextFieldState()
 
     var showPassword by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+
+
+if (isLandscape) {
+    Row(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(" \nCertificate generation details:", style = MaterialTheme.typography.labelLarge)
+            SecureTextField(
+                enabled = !isRunning,
+                state = passwordState,
+                label = { Text("Password") },
+                textObfuscationMode = if (showPassword) {
+                    TextObfuscationMode.Visible
+                } else {
+                    TextObfuscationMode.RevealLastTyped
+                },
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            imageVector = if (showPassword) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (showPassword) "Hide password" else "Show password"
+                        )
+                    }
+                }
+            )
+            TextField(
+                enabled = !isRunning,
+                state = domains,
+                label = { Text("Domains") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    enabled = !isRunning,
+                    selected = (format == "PEM"),
+                    onClick = { format = "PEM" })
+                Text("PEM-format", modifier = Modifier.padding(end = 16.dp))
+
+                RadioButton(
+                    enabled = !isRunning,
+                    selected = (format == "JWK"),
+                    onClick = { format = "JWK" })
+                Text("JWK-format")
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(enabled = !isRunning, onClick = {
+                    keyboardController?.hide()
+                    bgjob.launch {
+                        val (fullcert, fulldomain) = netrequest.genCertificate(
+                            passwordState.text.toString(),
+                            domains.text.toString()
+                        )
+                        certState.edit { replace(0, length, fullcert) }
+                        domainState.edit { replace(0, length, fulldomain) }
+
+                    }
+                }, modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (progress == 0) {
+                            "Generate DNS\n and Certificate"
+                        } else {
+                            "Generating...\n[" + "#".repeat(progress) + "_".repeat(9 - progress) + "]"
+                        }, textAlign = TextAlign.Center
+                    )
+                }
+
+                Button(enabled = !isRunning, onClick = {
+                    keyboardController?.hide()
+                    val (fullcert, fulldomain) = genKey(
+                        passwordState.text.toString(),
+                        domains.text.toString(), format
+                    )
+                    certState.edit { replace(0, length, fullcert) }
+                    domainState.edit { replace(0, length, fulldomain) }
+                }, modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Generate Key\n and CSR",
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            Text(
+                "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\n",
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            Text("DNS-record to add:", style = MaterialTheme.typography.labelLarge)
+            SelectionContainer {
+                TextField(
+                    state = domainState,
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+        }
+        Column(modifier = Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(" \nCertificate or private key:", style = MaterialTheme.typography.labelLarge)
+            SelectionContainer {
+                TextField(
+                    textStyle = TextStyle(fontFamily = FontFamily.Monospace),
+                    state = certState,
+                    readOnly = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                )
+            }
+        }
+        }
+}
+    else {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -255,7 +379,8 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
 
-        SecureTextField(enabled = !isRunning,
+        SecureTextField(
+            enabled = !isRunning,
             state = passwordState,
             label = { Text("Password") },
             textObfuscationMode = if (showPassword) {
@@ -281,10 +406,16 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(enabled = !isRunning, selected = (format == "PEM"), onClick = { format = "PEM" })
+            RadioButton(
+                enabled = !isRunning,
+                selected = (format == "PEM"),
+                onClick = { format = "PEM" })
             Text("PEM-format", modifier = Modifier.padding(end = 16.dp))
 
-            RadioButton(enabled = !isRunning, selected = (format == "JWK"), onClick = { format = "JWK" })
+            RadioButton(
+                enabled = !isRunning,
+                selected = (format == "JWK"),
+                onClick = { format = "JWK" })
             Text("JWK-format")
         }
 
@@ -292,7 +423,8 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(enabled = !isRunning, onClick = { keyboardController?.hide()
+            Button(enabled = !isRunning, onClick = {
+                keyboardController?.hide()
                 bgjob.launch {
                     val (fullcert, fulldomain) = netrequest.genCertificate(
                         passwordState.text.toString(),
@@ -302,27 +434,36 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
                     domainState.edit { replace(0, length, fulldomain) }
 
                 }
-                             }, modifier = Modifier.weight(1f)) {
-                Text(if (progress == 0) { "Generate DNS\n and Certificate" } else { "Generating...\n[" + "#".repeat(progress) + "_".repeat(9 - progress) + "]" }, textAlign = TextAlign.Center)
+            }, modifier = Modifier.weight(1f)) {
+                Text(
+                    if (progress == 0) {
+                        "Generate DNS\n and Certificate"
+                    } else {
+                        "Generating...\n[" + "#".repeat(progress) + "_".repeat(9 - progress) + "]"
+                    }, textAlign = TextAlign.Center
+                )
             }
 
-                Button(enabled = !isRunning, onClick = {
-                    keyboardController?.hide()
-                    val (fullcert, fulldomain) = genKey(
-                        passwordState.text.toString(),
-                        domains.text.toString(), format
-                    )
-                    certState.edit { replace(0, length, fullcert) }
-                    domainState.edit { replace(0, length, fulldomain) }
-                }, modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Generate Key\n and CSR",
-                        textAlign = TextAlign.Center
-                    )
-                }
+            Button(enabled = !isRunning, onClick = {
+                keyboardController?.hide()
+                val (fullcert, fulldomain) = genKey(
+                    passwordState.text.toString(),
+                    domains.text.toString(), format
+                )
+                certState.edit { replace(0, length, fullcert) }
+                domainState.edit { replace(0, length, fulldomain) }
+            }, modifier = Modifier.weight(1f)) {
+                Text(
+                    "Generate Key\n and CSR",
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
-        Text("\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\n", style = MaterialTheme.typography.labelLarge)
+        Text(
+            "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\n",
+            style = MaterialTheme.typography.labelLarge
+        )
 
         Text("DNS-record to add:", style = MaterialTheme.typography.labelLarge)
         SelectionContainer {
@@ -336,6 +477,7 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
         Text("Certificate or private key:", style = MaterialTheme.typography.labelLarge)
         SelectionContainer {
             TextField(
+                textStyle = TextStyle(fontFamily = FontFamily.Monospace),
                 state = certState,
                 readOnly = true,
                 modifier = Modifier
@@ -344,6 +486,11 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
             )
         }
     }
+
+
+
+}
+
 }
 
 
@@ -373,7 +520,7 @@ class CreateNetworkThread : ViewModel() {
         val ecPrivate = kf.generatePrivate(keypairprivate)
         val retrofit = Retrofit.Builder().baseUrl(acmeURL).addConverterFactory(GsonConverterFactory.create()).build()
         val api = retrofit.create(AcmeApi::class.java)
-            try {
+        try {
                 val directory = api.getDirectory()
                 val objNonce = api.blankGet(directory.newNonce)
                 nonce = objNonce.headers()["Replay-Nonce"] ?: nonce
@@ -485,12 +632,12 @@ class CreateNetworkThread : ViewModel() {
 
                 }
             } catch (e: Exception) {
-                progress = 0
-                e.printStackTrace()
+            progress = 0
+            val sw = StringWriter()
+            e.printStackTrace(PrintWriter(sw))
+            val exceptionAsString = sw.toString()
+            return Pair(exceptionAsString, "Fatal error occurred, are you connected to the internet?")
             }
-
-        progress = 0
-        return Pair("", "")
     }
 }
 
