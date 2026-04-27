@@ -609,7 +609,6 @@ class CreateNetworkThread : ViewModel() {
                     while (true) {
                         progress = 8
                         delay(1000)
-                        Log.d("ACME_DEBUG", ordercheck.body()!!.status)
                         ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
                         nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
                         if (ordercheck.body()!!.status == "invalid") {
