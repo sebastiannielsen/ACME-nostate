@@ -72,7 +72,6 @@ import org.bouncycastle.asn1.x9.X9ObjectIdentifiers
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import android.os.Build
-import android.util.Log
 import androidx.annotation.Keep
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.darkColorScheme
