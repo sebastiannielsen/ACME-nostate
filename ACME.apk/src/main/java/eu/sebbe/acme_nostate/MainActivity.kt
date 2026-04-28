@@ -32,9 +32,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.TextField
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -88,7 +85,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import java.security.interfaces.ECPrivateKey
@@ -98,54 +94,136 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.ECDSASigner
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.nimbusds.jose.shaded.gson.annotations.SerializedName
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Headers
 import java.io.PrintWriter
 import java.io.StringWriter
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.Json
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+
+val IconVisibility: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "Visibility",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).path(fill = SolidColor(Color.Black)) {
+        moveTo(12f, 4.5f)
+        curveTo(7f, 4.5f, 2.73f, 7.61f, 1f, 12f)
+        curveToRelative(1.73f, 4.39f, 6f, 7.5f, 11f, 7.5f)
+        reflectiveCurveToRelative(9.27f, -3.11f, 11f, -7.5f)
+        curveToRelative(-1.73f, -4.39f, -6f, -7.5f, -11f, -7.5f)
+        close()
+        moveTo(12f, 17f)
+        curveToRelative(-2.76f, 0f, -5f, -2.24f, -5f, -5f)
+        reflectiveCurveToRelative(2.24f, -5f, 5f, -5f)
+        reflectiveCurveToRelative(5f, 2.24f, 5f, 5f)
+        reflectiveCurveToRelative(-2.24f, 5f, -5f, 5f)
+        close()
+        moveTo(12f, 9f)
+        curveToRelative(-1.66f, 0f, -3f, 1.34f, -3f, 3f)
+        reflectiveCurveToRelative(1.34f, 3f, 3f, 3f)
+        reflectiveCurveToRelative(3f, -1.34f, 3f, -3f)
+        reflectiveCurveToRelative(-1.34f, -3f, -3f, -3f)
+        close()
+    }.build()
+}
+
+val IconVisibilityOff: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "VisibilityOff",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).path(fill = SolidColor(Color.Black)) {
+        moveTo(12f, 7f)
+        curveToRelative(2.76f, 0f, 5f, 2.24f, 5f, 5f)
+        curveToRelative(0f, 0.65f, -0.13f, 1.26f, -0.36f, 1.82f)
+        lineToRelative(2.92f, 2.92f)
+        curveToRelative(1.51f, -1.39f, 2.72f, -3.12f, 3.44f, -5.08f)
+        curveToRelative(-1.73f, -4.39f, -6f, -7.5f, -11f, -7.5f)
+        curveToRelative(-1.4f, 0f, -2.74f, 0.25f, -3.98f, 0.7f)
+        lineToRelative(2.16f, 2.16f)
+        curveToRelative(0.56f, -0.07f, 1.17f, -0.2f, 1.82f, -0.2f)
+        close()
+        moveTo(2f, 4.27f)
+        lineToRelative(2.28f, 2.28f)
+        lineToRelative(0.46f, 0.46f)
+        curveTo(3.08f, 8.3f, 1.78f, 10.02f, 1f, 12f)
+        curveToRelative(1.73f, 4.39f, 6f, 7.5f, 11f, 7.5f)
+        curveToRelative(1.55f, 0f, 3.03f, -0.3f, 4.38f, -0.84f)
+        lineToRelative(0.42f, 0.42f)
+        lineTo(19.73f, 22f)
+        lineTo(21f, 20.73f)
+        lineTo(3.27f, 3f)
+        lineTo(2f, 4.27f)
+        close()
+        moveTo(7.53f, 9.8f)
+        lineToRelative(1.55f, 1.55f)
+        curveToRelative(-0.05f, 0.21f, -0.08f, 0.43f, -0.08f, 0.65f)
+        curveToRelative(0f, 1.66f, 1.34f, 3f, 3f, 3f)
+        curveToRelative(0.22f, 0f, 0.44f, -0.03f, 0.65f, -0.08f)
+        lineToRelative(1.55f, 1.55f)
+        curveToRelative(-0.67f, 0.33f, -1.41f, 0.53f, -2.2f, 0.53f)
+        curveToRelative(-2.76f, 0f, -5f, -2.24f, -5f, -5f)
+        curveToRelative(0f, -0.79f, 0.2f, -1.53f, 0.53f, -2.2f)
+        close()
+        moveTo(11.84f, 9.02f)
+        lineToRelative(3.15f, 3.15f)
+        lineToRelative(0.02f, -0.16f)
+        curveToRelative(0f, -1.66f, -1.34f, -3f, -3f, -3f)
+        lineToRelative(-0.17f, 0.01f)
+        close()
+    }.build()
+}
+
 
 @Keep
 @Serializable
 data class Directory(
-    @SerializedName("newNonce") val newNonce: String,
-    @SerializedName("newAccount") val newAccount: String,
-    @SerializedName("newOrder") val newOrder: String,
-    @SerializedName("meta") val meta: Meta
+    @SerialName("newNonce") val newNonce: String,
+    @SerialName("newAccount") val newAccount: String,
+    @SerialName("newOrder") val newOrder: String,
+    @SerialName("meta") val meta: Meta
 )
 
 @Keep
 @Serializable
 data class Meta(
-    @SerializedName("caaIdentities") val caaIdentities: List<String>
+    @SerialName("caaIdentities") val caaIdentities: List<String>
 )
 
 @Keep
 @Serializable
 data class Order(
-    @SerializedName("status") val status: String,
-    @SerializedName("authorizations") val authorizations: List<String>,
-    @SerializedName("finalize") val finalize: String,
-    @SerializedName("certificate") val certificate: String?
+    @SerialName("status") val status: String,
+    @SerialName("authorizations") val authorizations: List<String>,
+    @SerialName("finalize") val finalize: String,
+    @SerialName("certificate") val certificate: String? = ""
 )
 
 @Keep
 @Serializable
 data class Autz(
-    @SerializedName("challenges") val challenges: List<Chal>
+    @SerialName("challenges") val challenges: List<Chal>
 )
 
 @Keep
 @Serializable
 data class Chal(
-    @SerializedName("url") val url: String,
-    @SerializedName("type") val type: String
+    @SerialName("url") val url: String,
+    @SerialName("type") val type: String
 )
 
 @Keep
@@ -193,7 +271,6 @@ private var nonce: String = ""
 @Composable
 fun AcmenostateTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -237,9 +314,8 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = viewModel()) {
-    val netrequest: CreateNetworkThread = viewModel()
-    val progress = viewModel.progress
+fun AcmeForm(modifier: Modifier = Modifier) {
+    var progress by remember { mutableIntStateOf(0) }
     val isRunning = progress > 0
     val bgjob = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -252,7 +328,6 @@ fun AcmeForm(modifier: Modifier = Modifier, viewModel: CreateNetworkThread = vie
     var showPassword by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
 
 
 if (isLandscape) {
@@ -272,7 +347,7 @@ if (isLandscape) {
                 trailingIcon = {
                     IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword }) {
                         Icon(
-                            imageVector = if (showPassword) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            imageVector = if (showPassword) IconVisibility else IconVisibilityOff,
                             contentDescription = if (showPassword) "Hide password" else "Show password"
                         )
                     }
@@ -306,10 +381,9 @@ if (isLandscape) {
                 Button(enabled = !isRunning, onClick = {
                     keyboardController?.hide()
                     bgjob.launch {
-                        val (fullcert, fulldomain) = netrequest.genCertificate(
+                        val (fullcert, fulldomain) = genCertificate(
                             passwordState.text.toString(),
-                            domains.text.toString()
-                        )
+                            domains.text.toString(), onProgress = { currentProgress -> progress = currentProgress} )
                         certState.edit { replace(0, length, fullcert) }
                         domainState.edit { replace(0, length, fulldomain) }
 
@@ -391,7 +465,7 @@ if (isLandscape) {
             trailingIcon = {
                 IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword }) {
                     Icon(
-                        imageVector = if (showPassword) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                        imageVector = if (showPassword) IconVisibility else IconVisibilityOff,
                         contentDescription = if (showPassword) "Hide password" else "Show password"
                     )
                 }
@@ -425,9 +499,9 @@ if (isLandscape) {
             Button(enabled = !isRunning, onClick = {
                 keyboardController?.hide()
                 bgjob.launch {
-                    val (fullcert, fulldomain) = netrequest.genCertificate(
+                    val (fullcert, fulldomain) = genCertificate(
                         passwordState.text.toString(),
-                        domains.text.toString()
+                        domains.text.toString(), onProgress = { currentProgress -> progress = currentProgress }
                     )
                     certState.edit { replace(0, length, fullcert) }
                     domainState.edit { replace(0, length, fulldomain) }
@@ -492,10 +566,7 @@ if (isLandscape) {
 
 }
 
-
-class CreateNetworkThread : ViewModel() {
-    var progress by mutableIntStateOf(0)
-    suspend fun genCertificate(passwd: String, domains: String): Pair<String, String> {
+    suspend fun genCertificate(passwd: String, domains: String, onProgress: (Int) -> Unit): Pair<String, String> {
         val acmeURL: String = if (staging == 1) {
             "https://acme-staging-v02.api.letsencrypt.org"
         } else {
@@ -505,7 +576,7 @@ class CreateNetworkThread : ViewModel() {
         if (passwd.isEmpty()) {
             return Pair("", "The password cannot be empty.")
         }
-        progress = 1
+        onProgress(1)
         val dgest = MessageDigest.getInstance("SHA-384")
         val acctpassword = "$passwd-"
         var accounturi: String
@@ -517,7 +588,8 @@ class CreateNetworkThread : ViewModel() {
         val keypairprivate = ECPrivateKeySpec(BigInteger(1, hashBytes), ecSpec)
         val kf = KeyFactory.getInstance("EC", "AndroidOpenSSL")
         val ecPrivate = kf.generatePrivate(keypairprivate)
-        val retrofit = Retrofit.Builder().baseUrl(acmeURL).addConverterFactory(GsonConverterFactory.create()).build()
+        val json = Json {ignoreUnknownKeys = true; coerceInputValues = true }
+        val retrofit = Retrofit.Builder().baseUrl(acmeURL).addConverterFactory(json.asConverterFactory("application/json".toMediaType())).build()
         val api = retrofit.create(AcmeApi::class.java)
         try {
                 val directory = api.getDirectory()
@@ -525,7 +597,7 @@ class CreateNetworkThread : ViewModel() {
                 nonce = objNonce.headers()["Replay-Nonce"] ?: nonce
                 val objAcctCreate = api.blankPost(directory.newAccount, genJWK(directory.newAccount, ecPrivate, "{\"termsOfServiceAgreed\": true}", ""))
                 if (objAcctCreate.code() > 399) {
-                    progress = 0
+                    onProgress(0)
                     return Pair(
                         "Invalid password",
                         "Failed to access or create account - invalid password?"
@@ -535,7 +607,7 @@ class CreateNetworkThread : ViewModel() {
                 accounturi = objAcctCreate.headers()["Location"] ?: ""
                 caadomain = directory.meta.caaIdentities[0]
                 if (domains.isEmpty()) {
-                    progress = 0
+                    onProgress(0)
                     return Pair(
                         "Please add the above DNS record to your DNS, remembering to replace YOURDOMAIN.TLD with your domain",
                         "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
@@ -543,12 +615,12 @@ class CreateNetworkThread : ViewModel() {
                 }
                 else
                 {
-                    progress = 2
+                    onProgress(2)
                     val listdomains = domains.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { listOf(it, "*.$it") }.distinct()
                     val jsonorder = """{"identifiers": [${listdomains.joinToString(",") { """{"type": "dns", "value": "$it"}""" }}]}"""
                     val order = api.getOrder(directory.newOrder, genJWK(directory.newOrder, ecPrivate, jsonorder, accounturi))
                     if (order.code() > 399) {
-                        progress = 0
+                        onProgress(0)
                         return Pair(
                             "Unable to create order - did you request certificate for a blacklisted domain?",
                             "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
@@ -557,7 +629,7 @@ class CreateNetworkThread : ViewModel() {
                     nonce = order.headers()["Replay-Nonce"] ?: nonce
                     val orderuri = order.headers()["Location"] ?: ""
                     for (auth in order.body()!!.authorizations) {
-                        progress = 3
+                        onProgress(3)
                         val autz = api.getAutz(auth, genJWK(auth, ecPrivate, "", accounturi ))
                         nonce = autz.headers()["Replay-Nonce"] ?: nonce
                         for (chal in autz.body()!!.challenges) {
@@ -568,16 +640,16 @@ class CreateNetworkThread : ViewModel() {
                         }
                         }
                     }
-                    progress = 4
+                    onProgress(4)
                     var ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
                     nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
                     while (true) {
-                        progress = 5
+                        onProgress(5)
                         delay(1000)
                         ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
                         nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
                         if (ordercheck.body()!!.status == "invalid") {
-                            progress = 0
+                            onProgress(0)
                             return Pair(
                                 "Error validating domains, you have not published the DNS records yet!",
                                 "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
@@ -587,7 +659,7 @@ class CreateNetworkThread : ViewModel() {
                             break
                         }
                     }
-                    progress = 6
+                    onProgress(6)
                     val hbb = dgest.digest(passwd.toByteArray(Charsets.UTF_8))
                     val kpp = ECPrivateKeySpec(BigInteger(1, hbb), ecSpec)
                     val kfp = KeyFactory.getInstance("EC", "AndroidOpenSSL")
@@ -595,18 +667,18 @@ class CreateNetworkThread : ViewModel() {
                     val csrjson = "{\"csr\": \"" + android.util.Base64.encodeToString(genCSR(crtprivate, domains), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING) + "\"}"
                     val csrresponse = api.blankPost(ordercheck.body()!!.finalize, genJWK(ordercheck.body()!!.finalize, ecPrivate, csrjson , accounturi))
                     if (csrresponse.code() > 399) {
-                        progress = 0
+                        onProgress(0)
                         return Pair(
                             "Unable to submit CSR - something in the CSR is wierd?",
                             "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
                         )
                     }
                     nonce = csrresponse.headers()["Replay-Nonce"] ?: nonce
-                    progress = 7
+                    onProgress(7)
                     ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
                     nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
                     while (true) {
-                        progress = 8
+                        onProgress(8)
                         delay(1000)
                         ordercheck = api.getOrder(orderuri, genJWK(orderuri, ecPrivate, "", accounturi))
                         nonce = ordercheck.headers()["Replay-Nonce"] ?: nonce
@@ -620,9 +692,9 @@ class CreateNetworkThread : ViewModel() {
                             break
                         }
                     }
-                    progress = 9
+                    onProgress(9)
                     val pemcertificate = api.fetchcertificate(ordercheck.body()!!.certificate!!, genJWK(ordercheck.body()!!.certificate!!, ecPrivate, "", accounturi))
-                    progress = 0
+                    onProgress(0)
                     return Pair(
                         pemcertificate.body()!!.string(),
                         "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
@@ -630,14 +702,13 @@ class CreateNetworkThread : ViewModel() {
 
                 }
             } catch (e: Exception) {
-            progress = 0
+            onProgress(0)
             val sw = StringWriter()
             e.printStackTrace(PrintWriter(sw))
             val exceptionAsString = sw.toString()
             return Pair(exceptionAsString, "Fatal error occurred, are you connected to the internet?")
             }
     }
-}
 
 fun genJWK(url: String, privkey: PrivateKey, payload: String, accounturi: String): RequestBody {
     var header: JWSHeader
