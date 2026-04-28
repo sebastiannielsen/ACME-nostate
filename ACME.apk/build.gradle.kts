@@ -16,8 +16,16 @@ android {
         applicationId = "eu.sebbe.acme_nostate"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
+        androidResources {
+            @Suppress("UnstableApiUsage")
+            localeFilters += "en"
+        }
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {
@@ -34,6 +42,16 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources.excludes += "org/bouncycastle/pkix/CertPathReviewerMessages_de.properties"
+        resources.excludes += "org/bouncycastle/pkix/CertPathReviewerMessages.properties"
+        resources.excludes += "META-INF/androidx/**"
+        resources.excludes += "META-INF/*.version"
+        resources.excludes += "DebugProbesKt.bin"
+        androidResources {
+            ignoreAssetsPatterns.add("PublicSuffixDatabase.list")
+        }
+    }
 }
 
 dependencies {
@@ -49,7 +67,7 @@ dependencies {
     implementation(libs.bouncycastle.bcpkix)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.retrofit.converter.kotlinx)
-    implementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(libs.androidx.compose.ui.tooling)
     compileOnly(libs.error.prone.annotations)
 }
