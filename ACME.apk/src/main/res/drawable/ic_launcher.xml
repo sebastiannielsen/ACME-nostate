@@ -30,11 +30,9 @@
                 android:scaleY="0.45"
                 android:pivotX="45"
                 android:pivotY="50">
-                <path android:strokeColor="@android:color/black" android:strokeWidth="5" android:strokeLineCap="round"
-                    android:pathData="M79,60 L72,60 M62,60 L61,60 M51,60 L37,60 M24,38 L32,24 M38,15 L45,2 M70,2 L72,5 M78,15 L81,20 M86,29 L91,38 M85,51 L33,51 L31,48 L55,3 L60,3 L82,41 L56,41 M45,41 L58,20 L66,32" />
-                <path android:strokeColor="@android:color/black" android:strokeWidth="5" android:strokeLineCap="round"
-                    android:pathData="M2,93 L2,74 L19,74 L19,93 M2,86 L19,86 M48,79 L48,74 L32,74 L32,93 L48,93 M60,93 L60,74 L72,74 L72,93 M73,74 L84,74 L84,93 M113,74 L96,74 L96,84 L113,84 M96,84 L96,93 L113,93"/>
-            </group>
+             </group>
+            <path android:strokeColor="@android:color/black" android:strokeWidth="5" android:strokeLineCap="round"
+                android:pathData="M79,60 L72,60 M62,60 L61,60 M51,60 L37,60 M24,38 L32,24 M38,15 L45,2 M70,2 L72,5 M78,15 L81,20 M86,29 L91,38 M85,51 L33,51 L31,48 L55,3 L60,3 L82,41 L56,41 M45,41 L58,20 L66,32 M2,93 L2,74 L19,74 L19,93 M2,86 L19,86 M48,79 L48,74 L32,74 L32,93 L48,93 M60,93 L60,74 L72,74 L72,93 M73,74 L84,74 L84,93 M113,74 L96,74 L96,84 L113,84 M96,84 L96,93 L113,93"/>
         </vector>
     </monochrome>
 </adaptive-icon>
