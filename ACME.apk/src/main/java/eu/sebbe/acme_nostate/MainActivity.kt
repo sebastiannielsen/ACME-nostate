@@ -71,6 +71,7 @@ import java.io.OutputStream
 import android.os.Build
 import androidx.annotation.Keep
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -112,9 +113,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.text.AnnotatedString
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+
 
 val IconVisibility: ImageVector by lazy {
     ImageVector.Builder(
@@ -276,15 +282,17 @@ fun AcmeForm(modifier: Modifier = Modifier) {
     val passwordState = rememberTextFieldState()
     val domainState = rememberTextFieldState()
     val certState = rememberTextFieldState()
-
+    val context = LocalContext.current
     var showPassword by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val clipboardManager = LocalClipboard.current
+    var copied = 1
 
 
 if (isLandscape) {
     Row(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.weight(1f).padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(" \nCertificate generation details:", style = MaterialTheme.typography.labelLarge)
             SecureTextField(
                 enabled = !isRunning,
@@ -295,9 +303,16 @@ if (isLandscape) {
                 } else {
                     TextObfuscationMode.RevealLastTyped
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                copied = 1
+                            }
+                        )
+                    },
                 trailingIcon = {
-                    IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword }) {
+                    IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword; copied = 1 }) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
                             Icon(
                                 imageVector = IconVisibility,
@@ -323,28 +338,36 @@ if (isLandscape) {
                 state = domains,
                 label = { Text("Domains") },
                 modifier = Modifier.fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                copied = 1
+                            }
+                        )
+                    }
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(
                     enabled = !isRunning,
                     selected = (format == "PEM"),
-                    onClick = { format = "PEM" })
-                Text("PEM-format", modifier = Modifier.padding(end = 16.dp))
+                    onClick = { format = "PEM"; copied = 1; keyboardController?.hide()})
+                Text("PEM-format", modifier = Modifier.padding(end = 6.dp))
 
                 RadioButton(
                     enabled = !isRunning,
                     selected = (format == "JWK"),
-                    onClick = { format = "JWK" })
+                    onClick = { format = "JWK"; copied = 1; keyboardController?.hide()})
                 Text("JWK-format")
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Button(enabled = !isRunning, onClick = {
                     keyboardController?.hide()
+                    copied = 1
                     bgjob.launch {
                         val (fullcert, fulldomain) = genCertificate(
                             passwordState.text.toString(),
@@ -365,6 +388,7 @@ if (isLandscape) {
 
                 Button(enabled = !isRunning, onClick = {
                     keyboardController?.hide()
+                    copied = 1
                     val (fullcert, fulldomain) = genKey(
                         passwordState.text.toString(),
                         domains.text.toString(), format
@@ -380,21 +404,35 @@ if (isLandscape) {
             }
 
             Text(
-                "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\n",
+                "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\nDNS-record to add:",
                 style = MaterialTheme.typography.labelLarge
             )
-
-            Text("DNS-record to add:", style = MaterialTheme.typography.labelLarge)
             SelectionContainer {
                 TextField(
                     state = domainState,
                     readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = {
+                                    keyboardController?.hide()
+                                    if (copied != 2) {
+                                        val clipData = android.content.ClipData.newPlainText("record", certState.text.toString())
+                                        val clipEntry = ClipEntry(clipData)
+                                        bgjob.launch {
+                                            clipboardManager.setClipEntry(clipEntry)
+                                        }
+                                        android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
+                                        copied = 2
+                                    }
+                                }
+                            )
+                        },
                 )
             }
 
         }
-        Column(modifier = Modifier.weight(1f).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.weight(1f).padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(" \nCertificate or private key:", style = MaterialTheme.typography.labelLarge)
             SelectionContainer {
                 TextField(
@@ -404,6 +442,22 @@ if (isLandscape) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = {
+                                    keyboardController?.hide()
+                                    if (copied != 3) {
+                                        val clipData = android.content.ClipData.newPlainText("certificate", certState.text.toString())
+                                        val clipEntry = ClipEntry(clipData)
+                                        bgjob.launch {
+                                            clipboardManager.setClipEntry(clipEntry)
+                                        }
+                                        android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
+                                        copied = 3
+                                    }
+                                }
+                            )
+                        }
                 )
             }
         }
@@ -413,8 +467,8 @@ if (isLandscape) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
 
         SecureTextField(
@@ -426,9 +480,16 @@ if (isLandscape) {
             } else {
                 TextObfuscationMode.RevealLastTyped
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            copied = 1
+                        }
+                    )
+                },
             trailingIcon = {
-                IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword }) {
+                IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword; copied = 1 }) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
                         Icon(
                             imageVector = IconVisibility,
@@ -454,28 +515,36 @@ if (isLandscape) {
             state = domains,
             label = { Text("Domains") },
             modifier = Modifier.fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            copied = 1
+                        }
+                    )
+                }
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             RadioButton(
                 enabled = !isRunning,
                 selected = (format == "PEM"),
-                onClick = { format = "PEM" })
-            Text("PEM-format", modifier = Modifier.padding(end = 16.dp))
+                onClick = { format = "PEM"; copied = 1; keyboardController?.hide()})
+            Text("PEM-format", modifier = Modifier.padding(end = 6.dp))
 
             RadioButton(
                 enabled = !isRunning,
                 selected = (format == "JWK"),
-                onClick = { format = "JWK" })
+                onClick = { format = "JWK"; copied = 1; keyboardController?.hide()})
             Text("JWK-format")
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Button(enabled = !isRunning, onClick = {
                 keyboardController?.hide()
+                copied = 1
                 bgjob.launch {
                     val (fullcert, fulldomain) = genCertificate(
                         passwordState.text.toString(),
@@ -483,7 +552,6 @@ if (isLandscape) {
                     )
                     certState.edit { replace(0, length, fullcert) }
                     domainState.edit { replace(0, length, fulldomain) }
-
                 }
             }, modifier = Modifier.weight(1f)) {
                 Text(
@@ -497,6 +565,7 @@ if (isLandscape) {
 
             Button(enabled = !isRunning, onClick = {
                 keyboardController?.hide()
+                copied = 1
                 val (fullcert, fulldomain) = genKey(
                     passwordState.text.toString(),
                     domains.text.toString(), format
@@ -512,16 +581,31 @@ if (isLandscape) {
         }
 
         Text(
-            "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\n",
+            "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\nDNS-record to add:",
             style = MaterialTheme.typography.labelLarge
         )
 
-        Text("DNS-record to add:", style = MaterialTheme.typography.labelLarge)
         SelectionContainer {
             TextField(
                 state = domainState,
                 readOnly = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                keyboardController?.hide()
+                                if (copied != 2) {
+                                    val clipData = android.content.ClipData.newPlainText("record", certState.text.toString())
+                                    val clipEntry = ClipEntry(clipData)
+                                    bgjob.launch {
+                                        clipboardManager.setClipEntry(clipEntry)
+                                    }
+                                    android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
+                                    copied = 2
+                                }
+                            }
+                        )
+                    },
             )
         }
 
@@ -534,6 +618,22 @@ if (isLandscape) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                keyboardController?.hide()
+                                if (copied != 3) {
+                                val clipData = android.content.ClipData.newPlainText("certificate", certState.text.toString())
+                                val clipEntry = ClipEntry(clipData)
+                                bgjob.launch {
+                                    clipboardManager.setClipEntry(clipEntry)
+                                }
+                                    android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
+                                    copied = 3
+                                }
+                            }
+                        )
+                    }
             )
         }
     }
