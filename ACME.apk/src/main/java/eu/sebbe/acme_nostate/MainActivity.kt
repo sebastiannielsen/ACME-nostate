@@ -554,6 +554,9 @@ if (isLandscape) {
         if (passwd.isEmpty()) {
             return Pair("", "The password cannot be empty.")
         }
+        if (domains.contains("*")) {
+            return Pair("", "Domains cannot contain * - wildcard is included automatically.")
+        }
         onProgress(1)
         val dgest = MessageDigest.getInstance("SHA-384")
         val acctpassword = "$passwd-"
@@ -725,12 +728,12 @@ fun genJWK(url: String, privkey: PrivateKey, payload: String, accounturi: String
 return acmeRequestBody.toRequestBody("application/jose+json".toMediaType())
 }
 
-
-
-
 fun genKey(passwd: String, domains: String, format: String): Pair<String, String> {
     if (passwd.isEmpty()) {
         return Pair("", "The password cannot be empty.")
+    }
+    if (domains.contains("*")) {
+        return Pair("", "Domains cannot contain * - wildcard is included automatically.")
     }
     var certState: String
     val dgest = MessageDigest.getInstance("SHA-384")
