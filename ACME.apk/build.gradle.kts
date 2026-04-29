@@ -23,8 +23,8 @@ android {
             localeFilters += "en"
         }
         ndk {
-            //noinspection ChromeOsAbiSupport
-            abiFilters += "arm64-v8a"
+            abiFilters.add("arm64-v8a")
+            abiFilters.add("x86_64")
         }
     }
 
@@ -45,9 +45,8 @@ android {
     packaging {
         resources.excludes += "org/bouncycastle/pkix/CertPathReviewerMessages_de.properties"
         resources.excludes += "org/bouncycastle/pkix/CertPathReviewerMessages.properties"
-        resources.excludes += "META-INF/androidx/**"
-        resources.excludes += "META-INF/*.version"
         resources.excludes += "DebugProbesKt.bin"
+        resources.excludes += "META-INF/**"
         androidResources {
             ignoreAssetsPatterns.add("PublicSuffixDatabase.list")
         }
