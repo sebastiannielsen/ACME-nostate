@@ -71,7 +71,6 @@ import java.io.OutputStream
 import android.os.Build
 import androidx.annotation.Keep
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -84,6 +83,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.platform.LocalConfiguration
@@ -113,7 +113,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import kotlinx.serialization.SerialName
@@ -281,7 +280,6 @@ fun AcmeForm(modifier: Modifier = Modifier) {
     val passwordState = rememberTextFieldState()
     val domainState = rememberTextFieldState()
     val certState = rememberTextFieldState()
-    val context = LocalContext.current
     var showPassword by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -303,12 +301,10 @@ if (isLandscape) {
                     TextObfuscationMode.RevealLastTyped
                 },
                 modifier = Modifier.fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
                                 copied = 1
                             }
-                        )
                     },
                 trailingIcon = {
                     IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword; copied = 1 }) {
@@ -337,12 +333,10 @@ if (isLandscape) {
                 state = domains,
                 label = { Text("Domains") },
                 modifier = Modifier.fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
                                 copied = 1
                             }
-                        )
                     }
             )
 
@@ -411,9 +405,8 @@ if (isLandscape) {
                     state = domainState,
                     readOnly = true,
                     modifier = Modifier.fillMaxWidth()
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = {
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
                                     keyboardController?.hide()
                                     if (copied != 2) {
                                         val clipData = android.content.ClipData.newPlainText("record", certState.text.toString())
@@ -421,11 +414,9 @@ if (isLandscape) {
                                         bgjob.launch {
                                             clipboardManager.setClipEntry(clipEntry)
                                         }
-                                        android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
-                                        copied = 2
+                                       copied = 2
                                     }
                                 }
-                            )
                         },
                 )
             }
@@ -441,9 +432,8 @@ if (isLandscape) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight()
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = {
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
                                     keyboardController?.hide()
                                     if (copied != 3) {
                                         val clipData = android.content.ClipData.newPlainText("certificate", certState.text.toString())
@@ -451,11 +441,9 @@ if (isLandscape) {
                                         bgjob.launch {
                                             clipboardManager.setClipEntry(clipEntry)
                                         }
-                                        android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
                                         copied = 3
                                     }
                                 }
-                            )
                         }
                 )
             }
@@ -480,12 +468,10 @@ if (isLandscape) {
                 TextObfuscationMode.RevealLastTyped
             },
             modifier = Modifier.fillMaxWidth()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = {
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused) {
                             copied = 1
                         }
-                    )
                 },
             trailingIcon = {
                 IconButton(enabled = !isRunning, onClick = { showPassword = !showPassword; copied = 1 }) {
@@ -514,12 +500,10 @@ if (isLandscape) {
             state = domains,
             label = { Text("Domains") },
             modifier = Modifier.fillMaxWidth()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = {
-                            copied = 1
-                        }
-                    )
+                .onFocusChanged { focusState ->
+                    if (focusState.isFocused) {
+                        copied = 1
+                    }
                 }
         )
 
@@ -589,9 +573,8 @@ if (isLandscape) {
                 state = domainState,
                 readOnly = true,
                 modifier = Modifier.fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
                                 keyboardController?.hide()
                                 if (copied != 2) {
                                     val clipData = android.content.ClipData.newPlainText("record", certState.text.toString())
@@ -599,11 +582,9 @@ if (isLandscape) {
                                     bgjob.launch {
                                         clipboardManager.setClipEntry(clipEntry)
                                     }
-                                    android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
-                                    copied = 2
+                                     copied = 2
                                 }
                             }
-                        )
                     },
             )
         }
@@ -617,9 +598,8 @@ if (isLandscape) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
                                 keyboardController?.hide()
                                 if (copied != 3) {
                                 val clipData = android.content.ClipData.newPlainText("certificate", certState.text.toString())
@@ -627,11 +607,9 @@ if (isLandscape) {
                                 bgjob.launch {
                                     clipboardManager.setClipEntry(clipEntry)
                                 }
-                                    android.widget.Toast.makeText(context,"Text copied to clipboard!",android.widget.Toast.LENGTH_SHORT).show()
-                                    copied = 3
+                                   copied = 3
                                 }
-                            }
-                        )
+                        }
                     }
             )
         }
