@@ -390,14 +390,14 @@ if (isLandscape) {
                     domainState.edit { replace(0, length, fulldomain) }
                 }, modifier = Modifier.weight(1f)) {
                     Text(
-                        "Generate Key\n and CSR",
+                        "Generate TLSA\nKey and CSR",
                         textAlign = TextAlign.Center
                     )
                 }
             }
 
             Text(
-                "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\nDNS-record to add:",
+                "\nTo only generate DNS Record without Certificate, or generate TLSA and Key without CSR, leave \"Domains\" field blank.\nDNS-record to add:",
                 style = MaterialTheme.typography.labelLarge
             )
             SelectionContainer {
@@ -557,14 +557,14 @@ if (isLandscape) {
                 domainState.edit { replace(0, length, fulldomain) }
             }, modifier = Modifier.weight(1f)) {
                 Text(
-                    "Generate Key\n and CSR",
+                    "Generate TLSA\nKey and CSR",
                     textAlign = TextAlign.Center
                 )
             }
         }
 
         Text(
-            "\nTo only generate DNS Record without Certificate, or generate Private Key without CSR, leave \"Domains\" field blank.\nDNS-record to add:",
+            "\nTo only generate DNS Record without Certificate, or generate TLSA and Key without CSR, leave \"Domains\" field blank.\nDNS-record to add:",
             style = MaterialTheme.typography.labelLarge
         )
 
@@ -836,7 +836,9 @@ fun genKey(passwd: String, domains: String, format: String): Pair<String, String
                 .joinToString("\n") + "\n-----END CERTIFICATE REQUEST-----"
         }
     }
-    return Pair(certState, "")
+    val spkidgest = MessageDigest.getInstance("SHA-256")
+    val spkihex = spkidgest.digest(getPublicKey(eCPrivate).encoded).joinToString("") { "%02x".format(it) }
+    return Pair(certState, "_PORT._tcp.YOURDOMAIN.TLD IN TLSA 3 1 1 $spkihex")
 }
 
 fun genCSR(privateKey: PrivateKey, domainString: String): ByteArray? {
