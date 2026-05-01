@@ -1,4 +1,4 @@
-﻿Imports System.IO
+Imports System.IO
 Imports System.Runtime.InteropServices
 Imports System.Runtime.Serialization
 Imports System.Runtime.Serialization.Json
@@ -320,6 +320,7 @@ Module Module1
 
     Public Function GenerateKeyAndCSR(password As String, domains As String) As String()
         Dim sha384hash As SHA384 = SHA384.Create()
+        Dim sha256hash As SHA256 = SHA256.Create()
         Dim returnvalue(2) As String
         returnvalue(0) = ""
         returnvalue(1) = ""
@@ -327,6 +328,7 @@ Module Module1
         Dim footer As Byte() = {&HA0, &H7, &H6, &H5, &H2B, &H81, &H4, &H0, &H22}
         returnvalue(0) = "-----BEGIN EC PRIVATE KEY-----" & Environment.NewLine & System.Convert.ToBase64String(header.Concat(sha384hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password))).Concat(footer).ToArray(), Base64FormattingOptions.InsertLineBreaks) & Environment.NewLine & "-----END EC PRIVATE KEY-----"
         returnvalue(0) = returnvalue(0).Replace(vbCrLf, vbLf).Replace(vbLf, vbCrLf)
+        returnvalue(2) = "_PORT._tcp.YOURDOMAIN.TLD IN TLSA 3 1 1 " & BitConverter.ToString(sha256hash.ComputeHash(SPKI(GenPrivKey(password)))).Replace("-", "").ToLower()
         If (domains.Length > 3) And (Not domains.Contains("*")) Then
             returnvalue(1) = "-----BEGIN CERTIFICATE REQUEST-----" & Environment.NewLine & System.Convert.ToBase64String(GenCSR(password, domains), Base64FormattingOptions.InsertLineBreaks) & Environment.NewLine & "-----END CERTIFICATE REQUEST-----"
             returnvalue(1) = returnvalue(1).Replace(vbCrLf, vbLf).Replace(vbLf, vbCrLf)
@@ -356,6 +358,23 @@ Module Module1
         csr.CertificateExtensions.Add(sanBuilder.Build())
         Return csr.CreateSigningRequest
     End Function
+
+
+    Public Function SPKI(ecdsaKey As ECDsa) As Byte()
+        Dim params As ECParameters = ecdsaKey.ExportParameters(False)
+
+        Dim header As Byte() = {
+        &H30, &H76, &H30, &H10, &H6, &H7, &H2A, &H86, &H48, &HCE, &H3D, &H2, &H1,
+        &H6, &H5, &H2B, &H81, &H4, &H0, &H22, &H3, &H62, &H0
+        }
+        Dim ms As New System.IO.MemoryStream()
+        ms.Write(header, 0, header.Length)
+        ms.WriteByte(&H4)
+        ms.Write(params.Q.X, 0, params.Q.X.Length)
+        ms.Write(params.Q.Y, 0, params.Q.Y.Length)
+        Return ms.ToArray()
+    End Function
+
 
 
     Public Function GenPrivKey(password As String) As ECDsa
