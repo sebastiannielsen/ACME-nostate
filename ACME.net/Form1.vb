@@ -17,6 +17,7 @@ Public Class Form1
         Else
             returnedcontent = GenerateKeyAndCSR(TextBox1.Text, TextBox2.Text)
             TextBox4.Text = returnedcontent(0) & Environment.NewLine & Environment.NewLine & returnedcontent(1)
+            TextBox3.Text = returnedcontent(2)
         End If
 
     End Sub
