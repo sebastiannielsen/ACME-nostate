@@ -3,7 +3,7 @@ A stateless DNS-PERSIST-01 secp384r1 ACME client in different languages with cro
 
 # ACME.pl and ACME-nostate.exe usage:
 
-Requirements for ACME.pl: Net::ACME2, Net::ACME2::LetsEncrypt, Digest::SHA, Crypt::Perl::ECDSA, Crypt::Perl::ECDSA::Parse, Crypt::Perl::PKCS10, Crypt::PK::ECC
+Requirements for ACME.pl: Net::ACME2, Net::ACME2::LetsEncrypt, Digest::SHA, MIME::Base64, Crypt::PK::ECC
 
 Requirements for ACME-nostate.exe: .NET Framework 4.7.2
 
