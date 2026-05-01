@@ -38,7 +38,7 @@ You can also access the javascript client here: https://sebastiannielsen.github.
 
 You can also download the app on Google Play: https://play.google.com/store/apps/details?id=eu.sebbe.acme_nostate
 
-# Key generation on a server - run the following command in console:
+# Key generation on a server - run the following command:
 
 (can be done offline without network connection if you want and does not need root)
 
