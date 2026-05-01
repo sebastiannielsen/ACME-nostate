@@ -28,6 +28,15 @@ pkcs8.set(hashArray, header.length);
 
 CryptKey = await window.crypto.subtle.importKey("pkcs8", pkcs8.buffer, {name: "ECDSA",namedCurve: "P-384"}, true, ["sign"]);
 
+privkeydata = await window.crypto.subtle.exportKey("jwk", CryptKey);
+delete privkeydata.d
+privkeydata.key_ops = ["verify"];
+const pubkeydata = await window.crypto.subtle.importKey("jwk",privkeydata,{ name: "ECDSA", namedCurve: "P-384" },true,["verify"]);
+
+const spki_hash = asn_createhex(String.fromCharCode.apply(null, new Uint8Array(await window.crypto.subtle.digest("SHA-256", await window.crypto.subtle.exportKey("spki", pubkeydata)))));
+
+document.getElementById("txtrecord").innerHTML = '<pre>_PORT._tcp.YOURDOMAIN.TLD IN TLSA 3 1 1 ' + spki_hash + '</pre>'
+
 if (document.getElementById("pem").checked) {
 const pem = "-----BEGIN PRIVATE KEY-----\n" + btoa(String.fromCharCode.apply(null, pkcs8)).match(/.{1,64}/g).join("\n") + "\n-----END PRIVATE KEY-----\n\n";
 
@@ -396,8 +405,8 @@ function arraybuffertosign(input) {
 <h2>Password: <input style="font-size: 25" type="password" id="password"></h2>
 <h2>Domains: <input style="font-size: 25" type="text" id="domain"> (Comma-separated)</h2>
 <h2>Leave "Domains" blank + "Generate certificate" if you just want to get your DNS-PERSIST-01 record.</h2>
-<h2>Leave "Domains" blank + "Generate private key + CSR" for just the private key (NO CSR).</h2>
-<button id="gencrt" style="font-size: 25">Generate certificate</button> <button id="genpriv" style="font-size: 25">Generate private key + CSR</button><br>
+<h2>Leave "Domains" blank + "Generate private key + CSR + TLSA" for just the private key + TLSA (NO CSR).</h2>
+<button id="gencrt" style="font-size: 25">Generate certificate</button> <button id="genpriv" style="font-size: 25">Generate private key + CSR + TLSA</button><br>
 <h2><input type="radio" name="pkeytype" id="pem" style="height:15px; width:15px;" checked> PKCS8/PEM-format -- <input type="radio" style="height:15px; width:15px;" name="pkeytype"> JWK-format</h2>
 <br>
 <h2>Add following to DNS:</h2>
