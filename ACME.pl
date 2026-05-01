@@ -67,6 +67,10 @@ if (length($ARGV[2]) > 4) {
         while ($order->status() ne 'valid') {
             sleep 1;
             $acme->poll_order($order);
+            if ($order->status() eq 'invalid') {
+              print "Eeeek. CSR seems to be bad. Unexpected error.\n";
+              exit;
+           }
         }
         $pem = $acme->get_certificate_chain($order);
         open(CERTFILE, ">".$ARGV[1]);
