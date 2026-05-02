@@ -16,14 +16,15 @@ android {
         applicationId = "eu.sebbe.acme_nostate"
         minSdk = 30
         targetSdk = 36
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "3.0"
         androidResources {
             @Suppress("UnstableApiUsage")
             localeFilters += "en"
         }
         ndk {
             abiFilters.add("arm64-v8a")
+            abiFilters.add("armeabi-v7a")
             abiFilters.add("x86_64")
         }
     }
@@ -33,6 +34,18 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
+        debug {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            setProguardFiles(listOf(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            ))
+            proguardFile(project.file("proguard-rules.pro").apply {
+                writeText("-dontobfuscate")
+            })
         }
     }
     compileOptions {
