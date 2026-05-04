@@ -16,8 +16,8 @@ android {
         applicationId = "eu.sebbe.acme_nostate"
         minSdk = 30
         targetSdk = 36
-        versionCode = 3
-        versionName = "3.0"
+        versionCode = 4
+        versionName = "4.0"
         androidResources {
             @Suppress("UnstableApiUsage")
             localeFilters += "en"
@@ -56,8 +56,6 @@ android {
         compose = true
     }
     packaging {
-        resources.excludes += "org/bouncycastle/pkix/CertPathReviewerMessages_de.properties"
-        resources.excludes += "org/bouncycastle/pkix/CertPathReviewerMessages.properties"
         resources.excludes += "DebugProbesKt.bin"
         resources.excludes += "META-INF/**"
         androidResources {
@@ -75,8 +73,6 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.okhttp)
     implementation(libs.nimbus.jose.jwt)
-    implementation(libs.bouncycastle.bcprov)
-    implementation(libs.bouncycastle.bcpkix)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.retrofit.converter.kotlinx)
     implementation(libs.androidx.compose.ui.tooling.preview)
