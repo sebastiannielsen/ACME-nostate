@@ -2,6 +2,7 @@ package eu.sebbe.acme_nostate
 
 import android.content.res.Configuration
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,35 +16,56 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecureTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
+import androidx.compose.material3.Icon
+import androidx.compose.material3.TextField
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.material3.Icon
-import androidx.compose.material3.TextField
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers
-import org.bouncycastle.asn1.x500.X500Name
-import org.bouncycastle.asn1.x509.Extension
-import org.bouncycastle.asn1.x509.ExtensionsGenerator
-import org.bouncycastle.asn1.x509.GeneralName
-import org.bouncycastle.asn1.x509.GeneralNames
-import org.bouncycastle.jce.ECNamedCurveTable
-import org.bouncycastle.jce.spec.ECNamedCurveSpec
-import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.annotation.Keep
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.util.Base64
 import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
@@ -54,71 +76,34 @@ import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPrivateKeySpec
 import java.security.spec.ECPublicKeySpec
-import java.util.Base64
-import java.security.PublicKey
+import java.security.spec.ECFieldFp
+import java.security.interfaces.ECPrivateKey
+import java.security.interfaces.ECPublicKey
+import java.security.Signature
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.Json
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.ResponseBody
 import okhttp3.MediaType.Companion.toMediaType
 import retrofit2.Retrofit
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Body
 import retrofit2.http.Url
-import org.bouncycastle.operator.ContentSigner
-import org.bouncycastle.asn1.x509.AlgorithmIdentifier
-import org.bouncycastle.asn1.x9.X9ObjectIdentifiers
-import java.io.ByteArrayOutputStream
-import java.io.OutputStream
-import android.os.Build
-import androidx.annotation.Keep
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.Typography
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
+import retrofit2.Response
+import retrofit2.http.Headers
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
-import java.security.interfaces.ECPrivateKey
-import java.security.interfaces.ECPublicKey
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
 import com.nimbusds.jose.crypto.ECDSASigner
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.ResponseBody
-import retrofit2.Response
-import retrofit2.http.Headers
-import java.io.PrintWriter
-import java.io.StringWriter
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.json.Json
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
-
 
 val IconVisibility: ImageVector by lazy {
     ImageVector.Builder(
@@ -261,9 +246,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AcmenostateTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    AcmeForm(modifier = Modifier.padding(innerPadding))
-                }
+                AcmeForm(modifier = Modifier.padding(6.dp))
             }
         }
     }
@@ -457,7 +440,7 @@ if (isLandscape) {
             .padding(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-
+        Text(" \nCertificate generation details:", style = MaterialTheme.typography.labelLarge)
         SecureTextField(
             enabled = !isRunning,
             state = passwordState,
@@ -770,7 +753,7 @@ if (isLandscape) {
 
 fun genJWK(url: String, privkey: PrivateKey, payload: String, accounturi: String): RequestBody {
     var header: JWSHeader
-    val jwk = ECKey.Builder(Curve.P_384, getPublicKey(privkey) as ECPublicKey)
+    val jwk = ECKey.Builder(Curve.P_384, getPublicKey(privkey))
         .privateKey(privkey as ECPrivateKey)
         .build()
     val jwkFullJson = jwk.toPublicJWK()
@@ -822,7 +805,7 @@ fun genKey(passwd: String, domains: String, format: String): Pair<String, String
     val kf = KeyFactory.getInstance("EC", "AndroidOpenSSL")
     val eCPrivate = kf.generatePrivate(keypairprivate)
     if (format == "JWK") {
-        certState = ECKey.Builder(Curve.P_384, getPublicKey(eCPrivate) as ECPublicKey).privateKey(eCPrivate as ECPrivateKey).build().toJSONString()
+        certState = ECKey.Builder(Curve.P_384, getPublicKey(eCPrivate)).privateKey(eCPrivate as ECPrivateKey).build().toJSONString()
     }
     else {
         certState = if (domains.length < 4) {
@@ -841,63 +824,120 @@ fun genKey(passwd: String, domains: String, format: String): Pair<String, String
     return Pair(certState, "_PORT._tcp.YOURDOMAIN.TLD IN TLSA 3 1 1 $spkihex")
 }
 
-fun genCSR(privateKey: PrivateKey, domainString: String): ByteArray? {
+fun genCSR(privateKey: PrivateKey, domainString: String): ByteArray {
     val domains = domainString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-        .flatMap { listOf(it, "*.$it") }.distinct()
     val mainDomain = domains.first()
-    val entityName = X500Name("CN=$mainDomain")
-    val csrBuilder = JcaPKCS10CertificationRequestBuilder(entityName, getPublicKey(privateKey))
-    val altNames = domains.map { GeneralName(GeneralName.dNSName, it) }.toTypedArray()
-    val subjectAltNames = GeneralNames(altNames)
-    val extGen = ExtensionsGenerator()
-    extGen.addExtension(Extension.subjectAlternativeName, false, subjectAltNames)
-    csrBuilder.addAttribute(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest, extGen.generate())
-
-    val signer = object : ContentSigner {
-        private val outputStream = ByteArrayOutputStream()
-
-        private val bcParam = org.bouncycastle.crypto.util.OpenSSHPrivateKeyUtil.encodePrivateKey(
-            org.bouncycastle.jcajce.provider.asymmetric.util.ECUtil.generatePrivateKeyParameter(privateKey)
-        ).let {
-            val encoded = privateKey.encoded ?: throw IllegalArgumentException("PrivateKey.encoded is null!")
-            org.bouncycastle.crypto.util.PrivateKeyFactory.createKey(encoded)
-        }
-
-        private val sigGen = org.bouncycastle.crypto.signers.DSADigestSigner(
-            org.bouncycastle.crypto.signers.ECDSASigner(org.bouncycastle.crypto.signers.HMacDSAKCalculator(org.bouncycastle.crypto.digests.SHA384Digest())),
-            org.bouncycastle.crypto.digests.SHA384Digest()
-        ).apply {
-            init(true, bcParam)
-        }
-
-        override fun getAlgorithmIdentifier() = AlgorithmIdentifier(X9ObjectIdentifiers.ecdsa_with_SHA384)
-        override fun getOutputStream(): OutputStream = outputStream
-
-        override fun getSignature(): ByteArray {
-            val bytes = outputStream.toByteArray()
-            if (bytes.isEmpty()) throw IllegalStateException("No content to sign!")
-            sigGen.update(bytes, 0, bytes.size)
-            return sigGen.generateSignature()
-        }
+    val dnInner = "06035504030c" + toAsn1Hex(mainDomain.toByteArray())
+    val dn = wrap("30", wrap("31", wrap("30", dnInner)))
+    var sansHex = ""
+    for (d in domains) {
+        sansHex += "82" + toAsn1Hex(d.toByteArray())
+        sansHex += "82" + toAsn1Hex("*.$d".toByteArray())
     }
-
-    val csr = csrBuilder.build(signer)
-
-    return csr.encoded
+    var extensionRequest = wrap("30", sansHex)
+    extensionRequest = "0603551d1104" + toAsn1Hex(hexToByteArray(extensionRequest))
+    extensionRequest = wrap("30", extensionRequest)
+    extensionRequest = wrap("30", extensionRequest)
+    extensionRequest = "06092a864886f70d01090e31" + toAsn1Hex(hexToByteArray(extensionRequest))
+    extensionRequest = wrap("30", extensionRequest)
+    val attributes = wrap("a0", extensionRequest)
+    val spkiHeader = "3076301006072a8648ce3d020106052b81040022036200"
+    val pubKeyHex = bytesToHex(getPublicKey(privateKey).w.affineX.toPaddedByteArray(48)) +
+            bytesToHex(getPublicKey(privateKey).w.affineY.toPaddedByteArray(48))
+    val spki = spkiHeader + "04" + pubKeyHex
+    val version = "020100"
+    val tbsDataHex = wrap("30", version + dn + spki + attributes)
+    val tbsData = hexToByteArray(tbsDataHex)
+    val sigInstance = Signature.getInstance("SHA384withECDSA")
+    sigInstance.initSign(privateKey)
+    sigInstance.update(tbsData)
+    val signature = sigInstance.sign()
+    val algoId = "300a06082a8648ce3d040303"
+    val signatureBitString = "03" + toAsn1Hex(byteArrayOf(0) + signature) // 0 padding bits
+    val finalCsrHex = wrap("30", tbsDataHex + algoId + signatureBitString)
+    return hexToByteArray(finalCsrHex)
 }
 
-fun getPublicKey(privateKey: PrivateKey): PublicKey {
-    val kf = KeyFactory.getInstance("EC")
-    val privSpec = kf.getKeySpec(privateKey, ECPrivateKeySpec::class.java)
-    val s = privSpec.s
-    val bcParams = ECNamedCurveTable.getParameterSpec("secp384r1")
-    val q = bcParams.g.multiply(s).normalize()
-    val ecSpec = ECNamedCurveSpec("secp384r1", bcParams.curve, bcParams.g, bcParams.n)
-    val pubSpec = ECPublicKeySpec(
-        ECPoint(q.affineXCoord.toBigInteger(), q.affineYCoord.toBigInteger()),
-        ecSpec
-    )
-    return kf.generatePublic(pubSpec)
+
+private fun wrap(tag: String, hexContent: String): String {
+    return tag + getAsn1Length(hexContent.length / 2) + hexContent
+}
+
+private fun toAsn1Hex(bytes: ByteArray): String {
+    return getAsn1Length(bytes.size) + bytesToHex(bytes)
+}
+
+private fun getAsn1Length(len: Int): String {
+    if (len <= 127) return String.format("%02x", len)
+    val hexLen = Integer.toHexString(len)
+    val finalHex = if (hexLen.length % 2 != 0) "0$hexLen" else hexLen
+    return String.format("%02x", 0x80 or (finalHex.length / 2)) + finalHex
+}
+
+private fun BigInteger.toPaddedByteArray(n: Int): ByteArray {
+    val bytes = this.toByteArray()
+    val stripped = if (bytes.size > 1 && bytes[0] == 0.toByte()) {
+        bytes.copyOfRange(1, bytes.size)
+    } else {
+        bytes
+    }
+    return when {
+        stripped.size >= n -> stripped.takeLast(n).toByteArray()
+        else -> ByteArray(n - stripped.size) + stripped
+    }
+}
+
+private fun bytesToHex(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it) }
+private fun hexToByteArray(s: String) = ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+
+fun getPublicKey(privateKey: PrivateKey): ECPublicKey {
+    val priv = privateKey as ECPrivateKey
+    val s = priv.s
+    val params = priv.params
+    val field = params.curve.field as ECFieldFp
+    val p = field.p
+    val a = params.curve.a
+    val g = params.generator
+
+    var resX: BigInteger? = null
+    var resY: BigInteger? = null
+    var tempX = g.affineX
+    var tempY = g.affineY
+
+    for (i in 0 until s.bitLength()) {
+        if (s.testBit(i)) {
+            if (resX == null) {
+                resX = tempX
+                resY = tempY
+            } else {
+                val added = ecAdd(resX, resY!!, tempX, tempY, p, a)
+                resX = added.first
+                resY = added.second
+            }
+        }
+        val doubled = ecAdd(tempX, tempY, tempX, tempY, p, a)
+        tempX = doubled.first
+        tempY = doubled.second
+    }
+
+    val pubSpec = ECPublicKeySpec(ECPoint(resX!!, resY!!), params)
+    return KeyFactory.getInstance("EC").generatePublic(pubSpec) as ECPublicKey
+}
+
+private fun ecAdd(x1: BigInteger, y1: BigInteger, x2: BigInteger, y2: BigInteger, p: BigInteger, a: BigInteger): Pair<BigInteger, BigInteger> {
+    val lambda = if (x1 == x2 && y1 == y2) {
+        val num = x1.pow(2).multiply(3.toBigInteger()).add(a)
+        val den = y1.multiply(2.toBigInteger()).modInverse(p)
+        num.multiply(den).mod(p)
+    } else {
+        val num = y2.subtract(y1)
+        val den = x2.subtract(x1).modInverse(p)
+        num.multiply(den).mod(p)
+    }
+
+    val x3 = lambda.pow(2).subtract(x1).subtract(x2).mod(p)
+    val y3 = lambda.multiply(x1.subtract(x3)).subtract(y1).mod(p)
+    return x3 to y3
 }
 
 
