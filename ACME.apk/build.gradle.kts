@@ -16,8 +16,11 @@ android {
         applicationId = "eu.sebbe.acme_nostate"
         minSdk = 30
         targetSdk = 36
-        versionCode = 4
-        versionName = "4.0"
+        versionCode = 5
+        versionName = "5.0"
+        vectorDrawables {
+            useSupportLibrary = false
+        }
         androidResources {
             @Suppress("UnstableApiUsage")
             localeFilters += "en"
@@ -43,9 +46,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             ))
-            proguardFile(project.file("proguard-rules.pro").apply {
-                writeText("-dontobfuscate")
-            })
         }
     }
     compileOptions {
