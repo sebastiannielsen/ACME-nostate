@@ -7,38 +7,94 @@ use Crypt::PK::ECC;
 use MIME::Base64 qw(encode_base64);
 
 $inpass = $ARGV[0];
+$flags = $ARGV[1];
+@valmethods = ('', 'dns-persist-01', 'http-01');
+
 
 if (length($inpass) < 1) {
 print "Password cannot be blank. Use a secure password to prevent someone guessing your private key.\n";
 exit;
 }
+$flags =~ s/[^12]//sgi;
+$flags = substr($flags, 0, 1);
+
+if (length($flags) < 1) {
+print "Flags cannot be blank. Use 1 to use DNS-PERSIST-01, use 2 to use HTTP-01.\n";
+exit;
+}
+
 
 $acctpassword = pack("H*", sha384_hex($inpass."-"));
 
 $acct = Crypt::PK::ECC->new();
 $acct->import_key_raw($acctpassword, "secp384r1");
 
-if ($ARGV[2] eq "export") {
-open(PEMFILE, ">".$ARGV[1]);
+if ($ARGV[3] eq "export") {
+open(PEMFILE, ">".$ARGV[2]);
 print PEMFILE $cert->export_key_pem('private');
 close(PEMFILE);
-print "Written private key to ".$ARGV[1]."\n";
+print "Written private key to ".$ARGV[2]."\n";
 exit;
 }
 
 $acme = Net::ACME2::LetsEncrypt->new( key => $acct->export_key_pem('private'), environment => 'staging');
+
+
+if (($flags eq "2")&&(length($ARGV[3]) < 5)) {
+
+$keytoken = Net::ACME2::AccountKey->new( $acct->export_key_pem('private') )->get_jwk_thumbprint();
+
+printf <<'CONFIG', $keytoken, $keytoken, $keytoken;
+
+Add one of these snippets to your webserver config (depending on which server you have):
+
+Apache2 or LiteSpeed/OpenLiteSpeed:
+-----------------------------------------------------
+<Location "/.well-known/acme-challenge/">
+    RewriteEngine On
+    RewriteRule "\/([-_a-zA-Z0-9]+)$" "\/$1" [E=challenge:$1]
+    ErrorDocument 200 "%%{ENV:challenge}.%s"
+    RewriteRule ^ - [L,R=200]
+</Location>
+
+Nginix:
+-----------------------------------------------------
+location ~ ^/\.well-known/acme-challenge/([-_a-zA-Z0-9]+)$ {
+    default_type text/plain;
+    return 200 "$1.%s"
+}
+
+IIS web.config:
+-----------------------------------------------------
+<?xml version="1.0" encoding="UTF-8"?><configuration>
+<system.webServer><rewrite><rules><rule name="ACME-Challenge" stopProcessing="true">
+ <match url="^\.well-known/acme-challenge/([-_a-zA-Z0-9]+)$" />
+<action type="CustomResponse" statusCode="200" statusReason="OK" statusDescription="{R:1}.%s" />
+</rule></rules></rewrite></system.webServer></configuration>
+
+
+CONFIG
+
+exit;
+
+}
+
 $acme->create_account( termsOfServiceAgreed => 1 );
 
+if ($flags eq "1") {
 print "Add the following DNS record to your DNS:\n";
 print "_validation-persist.YOURDOMAIN.TLD 3600 IN TXT \"letsencrypt.org;accounturi=".$acme->key_id.";policy=wildcard\"\n\n";
+}
 
-if (length($ARGV[2]) > 4) {
+if (length($ARGV[3]) > 4) {
         @ids = ();
         @csr = ();
-        for ($i = 2; $i < $#ARGV + 1; $i++) {
+        for ($i = 3; $i < $#ARGV + 1; $i++) {
                 if (length($ARGV[$i]) > 4) {
                         push(@ids, { type => 'dns', value => $ARGV[$i] } );
+                        if ($flags eq "1") {
                         push(@ids, { type => 'dns', value => "*.".$ARGV[$i] } );
+                        }
                         push(@csr, $ARGV[$i]);
                 }
         }
@@ -46,7 +102,7 @@ if (length($ARGV[2]) > 4) {
         foreach $dauth ($order->authorizations()) {
                 $fdauth = $acme->get_authorization( $dauth );
                 foreach $chtype ($fdauth->challenges()) {
-                        if ($chtype->type() eq "dns-persist-01") {
+                        if ($chtype->type() eq $valmethods[int($flags)]) {
                                 $chall = Net::ACME2::Challenge->new(url => $chtype->url(), type => $chtype->type(), token => "", status => $chtype->status(), validated => $chtype->validated() );
                                 $acme->accept_challenge($chall);
                         }
@@ -67,10 +123,6 @@ if (length($ARGV[2]) > 4) {
         while ($order->status() ne 'valid') {
             sleep 1;
             $acme->poll_order($order);
-            if ($order->status() eq 'invalid') {
-              print "Eeeek. CSR seems to be bad. Unexpected error.\n";
-              exit;
-           }
         }
         $pem = $acme->get_certificate_chain($order);
         open(CERTFILE, ">".$ARGV[1]);
@@ -79,6 +131,7 @@ if (length($ARGV[2]) > 4) {
         print "Successfully generated LE certificate!\n";
 }
 
+
 sub genCsr() {
 $password = $_[0];
 
@@ -86,7 +139,13 @@ $versionheader = "020100";
 $sansobject = "";
 $dn = "";
 foreach $d (@_[1 .. $#_]) {
+if ($flags eq "1") {
 $sansobject = $sansobject . "82" . &asn1len(length($d) * 2) . unpack("H*", $d) . "82" . &asn1len((length($d) * 2) + 4) . unpack("H*", "*." . $d);
+}
+else
+{
+$sansobject = $sansobject . "82" . &asn1len(length($d) * 2) . unpack("H*", $d);
+}
 }
 $dn = unpack("H*", $_[1]);
 
