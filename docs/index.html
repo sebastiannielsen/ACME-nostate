@@ -2,7 +2,7 @@
 <head>
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAD3ElEQVR4AeyWTW4aQRCFq4eDZHyAnCHjjY0tRcJSFHtnOETWwBmirCE7OxuzcAy2EhkfIEeIPDlALmDZdN7X0COGwDD5kbLJqB9dXVVd/bqqe5jEfuFp3Zy0W5PjAVNa45P06PrYA8lZ0MnWun7dRa6L2gS0SOq8H5jzOcFdQzKC4BI/wG6Ju3PmelLVbrUJaGF2lo/2P/TJhHnL/MztgrBaMjsd7Z0NL/bPXRjX/KlFgN05Z21vfkjceSZsOjo4C0DvtHP8sMceeRtqESjtflFj/+Q6xUKz5L0Wyk1ZUG/0Ohv3Qd7yU4vAqHneUWp3WNBpp9pxT7vPOQcshCzdEBs+NieU1jmQWwmEesddzHdYOgcyhYU4G5IDqUDIuY6I3ElX2SoJsINQb4VgZ+yQnWqoqviuem5ELn0be7B5yyDNgRSRqXwq20YCBFTgnoL2iEC61c93Pz8HqW5AR9iVPhWjbpEF77vMl96Obo5vo8x4FRsJLBa0UfnahYMXiHkbskMh90q3Syw1PQtCxkHU0HRd0xgrjFd+1hIQ40wTMwLjH8rgbKrFpjEYBxMbIN3ciiAfnOXe29TpsCpOqhh9YlEWW/OsJSD2L4wF9WLhHDCPBRQwI5iCdtARNMIa89ozjtlQnFPIEcuZP2XOKtYSIO0Xe+e7WjBlJ958uHZahDTnBJUtIzPrAEkW0tw2PbEA8irWEiicnO9KziGk3uzJprwPkCmH6r2zBRxQ3DeikoBzxr9cShlIrTIQrhgyYLwNyhRZs01PJQGlnnc/97y3LtV1dIHgptWlryRA6km54H4XnBets7FVEoizSHcog15ARa8PEuykGDsyKOz6eGG8DbUImJ8940QvQ4HntdX1s5l/obFBxjmXOXPtqENfhVoElkqxo1IEcAsITIrjS0m6nOuGT9ThU4VaBKoC/KntP4F/n4HDw8P2MprN5vx0L4q7bIvysg9y1K/rsS9CGfKqDxkYyKFAkiS3OEpnci70GhcyPhqHpmtX6KX4SV7YZTLTvHsJJR8I9Gaz2Q6QsSeUMqAxrYMdeO9Ln1laIEWHTY7MV2fDxZhPNsYFoi92IFLJ3WQyyYG8vgmrLb+6uhpiBwrAt0B/2UkkptgULHyEKnCfsXxKZDU2+abyywrIeUCqgRxIj7rNjcAQ2uyx1UKGWSeAEph2RRoxbJ39FxyG2oCLUCaSzng83gUKTnrVlVpKdoRuRDykJa/6g0xxyHqIl1xeXhZ1enx8/KxsvCXNxFN5rtV/EZ4LLyMajcYryaGppu805xODh4eHr+pHy/O1w4/ShSbfNxK+C0W8HwAAAP//bHAuLgAAAAZJREFUAwDKAab7fGI/wAAAAABJRU5ErkJggg==">
-<title>Client-Side DNS-PERSIST-01 ACME2 Client</title>
+<title>Client-Side DNS-PERSIST-01/HTTP-01 ACME2 Client</title>
 <script>
 document.addEventListener('DOMContentLoaded', () => { 
 document.getElementById("genpriv").addEventListener('click', function(e) {genprivkey();});
@@ -75,6 +75,48 @@ let domains;
 let response;
 if (staging == 1) { ServerURL = "https://acme-staging-v02.api.letsencrypt.org/directory"; } else { ServerURL = "https://acme-v02.api.letsencrypt.org/directory"; }
 
+domains = document.getElementById("domain").value
+const hashArray = new Uint8Array(await window.crypto.subtle.digest("SHA-384",new TextEncoder().encode(document.getElementById("password").value + "-")));
+
+
+
+const header = new Uint8Array([0x30, 0x4e,0x02, 0x01, 0x00,0x30, 0x10,0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,0x04, 0x37,0x30, 0x35,0x02, 0x01, 0x01,0x04, 0x30]);
+
+const pkcs8 = new Uint8Array(header.length + hashArray.length);
+pkcs8.set(header);
+pkcs8.set(hashArray, header.length);
+
+CryptKey = await window.crypto.subtle.importKey("pkcs8", pkcs8.buffer, {name: "ECDSA",namedCurve: "P-384"}, true, ["sign"]);
+
+exportedkey = await window.crypto.subtle.exportKey("jwk", CryptKey);
+delete exportedkey.ext;
+delete exportedkey.key_ops;
+delete exportedkey.d;
+
+
+if ((document.getElementById("http").checked)&&(domains.length < 5)) {
+
+let keyAuth;
+keyAuth = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.digest("SHA-256",new TextEncoder().encode('{"crv":"P-384","kty":"EC","x":"' + exportedkey.x + '","y":"' + exportedkey.y + '"}'))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+document.getElementById("txtrecord").innerHTML = 'Use the web server configuration snippets below.';
+
+document.getElementById("pemcert").value = atob('QXBhY2hlMiBvciBMaXRlU3BlZWQvT3BlbkxpdGVTcGVlZDoKLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KPExvY2F0aW9uICIvLndlbGwta25vd24vYWNtZS1jaGFsbGVuZ2UvIj4KICAgIFJld3JpdGVFbmdpbmUgT24KICAgIFJld3JpdGVSdWxlICJcLyhbLV9hLXpBLVowLTldKykkIiAiXC8kMSIgW0U9Y2hhbGxlbmdlOiQxXQogICAgRXJyb3JEb2N1bWVudCAyMDAgIiV7RU5WOmNoYWxsZW5nZX0u') +
+keyAuth + atob('IgogICAgUmV3cml0ZVJ1bGUgXiAtIFtMLFI9MjAwXQo8L0xvY2F0aW9uPgoKTmdpbml4OgotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQpsb2NhdGlvbiB+IF4vXC53ZWxsLWtub3duL2FjbWUtY2hhbGxlbmdlLyhbLV9hLXpBLVowLTldKykkIHsKICAgIGRlZmF1bHRfdHlwZSB0ZXh0L3BsYWluOwogICAgcmV0dXJuIDIwMCAiJDEu') +
+keyAuth + atob('IjsKfQoKSUlTIHdlYi5jb25maWc6Ci0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCjw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9IlVURi04Ij8+PGNvbmZpZ3VyYXRpb24+CjxzeXN0ZW0ud2ViU2VydmVyPjxyZXdyaXRlPjxydWxlcz48cnVsZSBuYW1lPSJBQ01FLUNoYWxsZW5nZSIgc3RvcFByb2Nlc3Npbmc9InRydWUiPgogPG1hdGNoIHVybD0iXlwud2VsbC1rbm93bi9hY21lLWNoYWxsZW5nZS8oWy1fYS16QS1aMC05XSspJCIgLz4KPGFjdGlvbiB0eXBlPSJDdXN0b21SZXNwb25zZSIgc3RhdHVzQ29kZT0iMjAwIiBzdGF0dXNSZWFzb249Ik9LIiBzdGF0dXNEZXNjcmlwdGlvbj0ie1I6MX0u') +
+keyAuth + atob('IiAvPgo8L3J1bGU+PC9ydWxlcz48L3Jld3JpdGU+PC9zeXN0ZW0ud2ViU2VydmVyPjwvY29uZmlndXJhdGlvbj4=');
+
+document.getElementById("gencrt").disabled = false;
+document.getElementById("genpriv").disabled = false;
+document.getElementById("password").disabled = false;
+document.getElementById("domain").disabled = false;
+document.getElementById("pemcert").disabled = false;
+document.getElementById("gencrt").innerHTML = "Generate certificate";
+return;
+}
+
+
+
 document.getElementById("gencrt").disabled = true;
 document.getElementById("genpriv").disabled = true;
 document.getElementById("password").disabled = true;
@@ -97,22 +139,7 @@ response = await fetch(newnonce);
 nonce = response.headers.get("Replay-Nonce");
 
 
-const hashArray = new Uint8Array(await window.crypto.subtle.digest("SHA-384",new TextEncoder().encode(document.getElementById("password").value + "-")));
-const header = new Uint8Array([0x30, 0x4e,0x02, 0x01, 0x00,0x30, 0x10,0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,0x06, 0x05, 0x2b, 0x81, 0x04, 0x00, 0x22,0x04, 0x37,0x30, 0x35,0x02, 0x01, 0x01,0x04, 0x30]);
-
-const pkcs8 = new Uint8Array(header.length + hashArray.length);
-pkcs8.set(header);
-pkcs8.set(hashArray, header.length);
-
-CryptKey = await window.crypto.subtle.importKey("pkcs8", pkcs8.buffer, {name: "ECDSA",namedCurve: "P-384"}, true, ["sign"]);
-
 const createaccount = {}; 
-
-exportedkey = await window.crypto.subtle.exportKey("jwk", CryptKey);
-delete exportedkey.ext;
-delete exportedkey.key_ops;
-delete exportedkey.d;
-
 createaccount.protected = btoa('{"alg": "ES384", "jwk": ' + JSON.stringify(exportedkey,null,0) + ', "nonce": "' + nonce + '", "url": "' + newacct + '"}').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 createaccount.payload = "eyJ0ZXJtc09mU2VydmljZUFncmVlZCI6IHRydWV9";
 createaccount.signature = btoa(String.fromCharCode(...new Uint8Array(await window.crypto.subtle.sign({name: "ECDSA", hash: {name: "SHA-384"}},CryptKey, new TextEncoder().encode(createaccount.protected + "." + createaccount.payload))))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -135,9 +162,15 @@ return;
 
 nonce = response.headers.get("Replay-Nonce");
 accounturi = response.headers.get("Location");
-document.getElementById("txtrecord").innerHTML = '<pre>_validation-persist.YOURDOMAIN.TLD IN TXT "' + cadomain + ';accounturi=' + accounturi + ';policy=wildcard"</pre>';
 
-domains = document.getElementById("domain").value
+if (document.getElementById("dns").checked) {
+document.getElementById("txtrecord").innerHTML = '<pre>_validation-persist.YOURDOMAIN.TLD IN TXT "' + cadomain + ';accounturi=' + accounturi + ';policy=wildcard"</pre>';
+}
+else
+{
+document.getElementById("txtrecord").innerHTML = 'You have chosen HTTP-01 and hopefully configured the server config snippet.';
+}
+
 const createorder = {}; 
 
 
@@ -173,12 +206,20 @@ if (domains.includes("*")) {
 if (domains.includes(",")) {
 let newdomains = [];
 newdomains = domains.split(",");
+if (document.getElementById("dns").checked) {
 newdomains.forEach(function (item, index) {domainarray.push('{"type": "dns", "value": "' + item + '"}');domainarray.push('{"type": "dns", "value": "*.' + item + '"}');});
 }
 else
 {
+newdomains.forEach(function (item, index) {domainarray.push('{"type": "dns", "value": "' + item + '"}');});
+}
+}
+else
+{
 domainarray[0] = '{"type": "dns", "value": "' + domains + '"}';
+if (document.getElementById("dns").checked) {
 domainarray[1] = '{"type": "dns", "value": "*.' + domains + '"}';
+}
 }
 
 domainarray.forEach(function (item, index) { payloadstring = payloadstring + item + "," });
@@ -294,7 +335,7 @@ response = await fetch(url, {method: 'POST',headers: {'Content-Type': 'applicati
 nonce = response.headers.get("Replay-Nonce");
 const authobject = await response.json();
 challengeurl = "";
-authobject.challenges.forEach(function (item, index) { if (item.type == "dns-persist-01") { challengeurl = item.url; }});
+authobject.challenges.forEach(function (item, index) { if (item.type == document.querySelector('input[name="valmethod"]:checked').value) { challengeurl = item.url; }});
 
 response = {};
 authfetch = {};
@@ -316,12 +357,25 @@ let versionheader = "020100";
 
 if (sans.includes(",")) {
 newdomains = sans.split(",");
+if (document.getElementById("dns").checked) {
 newdomains.forEach(function (item, index) { sansobject = sansobject + "82" + asn1len(item.length * 2) + asn_createhex(item) + "82" + asn1len(item.length * 2 + 4) + asn_createhex("*." + item);});
+}
+else
+{
+newdomains.forEach(function (item, index) { sansobject = sansobject + "82" + asn1len(item.length * 2) + asn_createhex(item);});
+}
 dn = asn_createhex(newdomains[0]);
 }
 else
 {
+
+if (document.getElementById("dns").checked) {
 sansobject = "82" + asn1len(sans.length * 2) + asn_createhex(sans) + "82" + asn1len(sans.length * 2 + 4) + asn_createhex("*." + sans);
+}
+else
+{
+sansobject = "82" + asn1len(sans.length * 2) + asn_createhex(sans);
+}
 dn = asn_createhex(sans);
 }
 sansobject = "30" + asn1len(sansobject.length) + sansobject;
@@ -404,11 +458,11 @@ function arraybuffertosign(input) {
 <body>
 <h2>Password: <input style="font-size: 25" type="password" id="password"></h2>
 <h2>Domains: <input style="font-size: 25" type="text" id="domain"> (Comma-separated)</h2>
-<h2>Leave "Domains" blank + "Generate certificate" if you just want to get your DNS-PERSIST-01 record.</h2>
+<h2>Leave "Domains" blank + "Generate certificate" if you just want to get your DNS-PERSIST-01 record or HTTP-01 server config.</h2>
 <h2>Leave "Domains" blank + "Generate private key + CSR + TLSA" for just the private key + TLSA (NO CSR).</h2>
 <button id="gencrt" style="font-size: 25">Generate certificate</button> <button id="genpriv" style="font-size: 25">Generate private key + CSR + TLSA</button><br>
 <h2><input type="radio" name="pkeytype" id="pem" style="height:15px; width:15px;" checked> PKCS8/PEM-format -- <input type="radio" style="height:15px; width:15px;" name="pkeytype"> JWK-format</h2>
-<br>
+<h2><input type="radio" name="valmethod" id="dns" value="dns-persist-01" style="height:15px; width:15px;" checked> DNS-PERSIST-01 -- <input type="radio" style="height:15px; width:15px;" id="http" name="valmethod" value="http-01"> HTTP-01 (PERSIST)</h2>
 <h2>Add following to DNS:</h2>
 <h2><div id="txtrecord"><pre>&nbsp;</pre></div></h2>
 <h2>Certificate or private key:</h2>
