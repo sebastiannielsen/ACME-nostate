@@ -260,6 +260,7 @@ fun AcmeForm(modifier: Modifier = Modifier) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val domains = rememberTextFieldState()
     var format by remember { mutableStateOf("PEM") }
+    var valmethod by remember { mutableStateOf("dns-persist-01") }
     val passwordState = rememberTextFieldState()
     val domainState = rememberTextFieldState()
     val certState = rememberTextFieldState()
@@ -337,6 +338,21 @@ if (isLandscape) {
                 Text("JWK-format")
             }
 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    enabled = !isRunning,
+                    selected = (valmethod == "dns-persist-01"),
+                    onClick = { valmethod = "dns-persist-01"; copied = 1; keyboardController?.hide()})
+                Text("DNS-PERSIST-01", modifier = Modifier.padding(end = 6.dp))
+
+                RadioButton(
+                    enabled = !isRunning,
+                    selected = (valmethod == "http-01"),
+                    onClick = { valmethod = "http-01"; copied = 1; keyboardController?.hide()})
+                Text("HTTP-01")
+            }
+
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -347,7 +363,7 @@ if (isLandscape) {
                     bgjob.launch {
                         val (fullcert, fulldomain) = genCertificate(
                             passwordState.text.toString(),
-                            domains.text.toString(), onProgress = { currentProgress -> progress = currentProgress} )
+                            domains.text.toString(), valmethod, onProgress = { currentProgress -> progress = currentProgress} )
                         certState.edit { replace(0, length, fullcert) }
                         domainState.edit { replace(0, length, fulldomain) }
 
@@ -367,7 +383,7 @@ if (isLandscape) {
                     copied = 1
                     val (fullcert, fulldomain) = genKey(
                         passwordState.text.toString(),
-                        domains.text.toString(), format
+                        domains.text.toString(), format, valmethod
                     )
                     certState.edit { replace(0, length, fullcert) }
                     domainState.edit { replace(0, length, fulldomain) }
@@ -504,6 +520,21 @@ if (isLandscape) {
             Text("JWK-format")
         }
 
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(
+                enabled = !isRunning,
+                selected = (valmethod == "dns-persist-01"),
+                onClick = { valmethod = "dns-persist-01"; copied = 1; keyboardController?.hide()})
+            Text("DNS-PERSIST-01", modifier = Modifier.padding(end = 6.dp))
+
+            RadioButton(
+                enabled = !isRunning,
+                selected = (valmethod == "http-01"),
+                onClick = { valmethod = "http-01"; copied = 1; keyboardController?.hide()})
+            Text("HTTP-01")
+        }
+
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -514,7 +545,7 @@ if (isLandscape) {
                 bgjob.launch {
                     val (fullcert, fulldomain) = genCertificate(
                         passwordState.text.toString(),
-                        domains.text.toString(), onProgress = { currentProgress -> progress = currentProgress }
+                        domains.text.toString(), valmethod,  onProgress = { currentProgress -> progress = currentProgress }
                     )
                     certState.edit { replace(0, length, fullcert) }
                     domainState.edit { replace(0, length, fulldomain) }
@@ -534,7 +565,7 @@ if (isLandscape) {
                 copied = 1
                 val (fullcert, fulldomain) = genKey(
                     passwordState.text.toString(),
-                    domains.text.toString(), format
+                    domains.text.toString(), format, valmethod
                 )
                 certState.edit { replace(0, length, fullcert) }
                 domainState.edit { replace(0, length, fulldomain) }
@@ -604,7 +635,7 @@ if (isLandscape) {
 
 }
 
-    suspend fun genCertificate(passwd: String, domains: String, onProgress: (Int) -> Unit): Pair<String, String> {
+    suspend fun genCertificate(passwd: String, domains: String, method: String, onProgress: (Int) -> Unit): Pair<String, String> {
         val acmeURL: String = if (staging == 1) {
             "https://acme-staging-v02.api.letsencrypt.org"
         } else {
@@ -629,6 +660,25 @@ if (isLandscape) {
         val keypairprivate = ECPrivateKeySpec(BigInteger(1, hashBytes), ecSpec)
         val kf = KeyFactory.getInstance("EC", "AndroidOpenSSL")
         val ecPrivate = kf.generatePrivate(keypairprivate)
+        if ((method == "http-01")&&(domains.isEmpty())) {
+            val jwk = ECKey.Builder(Curve.P_384, getPublicKey(ecPrivate))
+                .privateKey(ecPrivate as ECPrivateKey)
+                .build()
+            val jwkFullJson = jwk.toPublicJWK()
+            val stringtohash = "{\"crv\":\"P-384\",\"kty\":\"EC\",\"x\":\"" + jwkFullJson.x + "\",\"y\":\"" + jwkFullJson.y + "\"}"
+            val kadgest = MessageDigest.getInstance("SHA-256")
+            val keyAuth = android.util.Base64.encodeToString(kadgest.digest(stringtohash.toByteArray(Charsets.UTF_8)), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+            val config1 =
+                $$"Apache2 Or LiteSpeed/OpenLiteSpeed:\n-----------------------------------------------------\n<Location \"/.well-known/acme-challenge/\">\n    RewriteEngine On\n    RewriteRule \"\\/([-_a-zA-Z0-9]+)$\" \"\\/$1\" [E=challenge:$1]\n    ErrorDocument 200 \"%{ENV:challenge}."
+            val config2 =
+                $$"\"\n    RewriteRule ^ - [L,R=200]\n</Location>\n\nNginix:\n-----------------------------------------------------\nlocation ~ ^/\\.well-known/acme-challenge/([-_a-zA-Z0-9]+)$ {\n    default_type text/plain;\n    return 200 \"$1."
+            val config3 =
+                "\";\n}\n\nIIS web.config:\n-----------------------------------------------------\n<?xml version=\"1.0\" encoding=\"UTF-8\"?><configuration>\n<system.webServer><rewrite><rules><rule name=\"ACME-Challenge\" stopProcessing=\"true\">\n<match url=\"^\\.well-known/acme-challenge/([-_a-zA-Z0-9]+)$\" />\n<action type=\"CustomResponse\" statusCode=\"200\" statusReason=\"OK\" statusDescription=\"{R:1}."
+            val config4 = "\" />\n</rule></rules></rewrite></system.webServer></configuration>"
+            onProgress(0)
+            return Pair(config1 + keyAuth + config2 + keyAuth + config3 + keyAuth + config4, "Insert the below server config snippet in your server")
+        }
+
         val json = Json {ignoreUnknownKeys = true; coerceInputValues = true }
         val retrofit = Retrofit.Builder().baseUrl(acmeURL).addConverterFactory(json.asConverterFactory("application/json".toMediaType())).build()
         val api = retrofit.create(AcmeApi::class.java)
@@ -647,24 +697,38 @@ if (isLandscape) {
                 nonce = objAcctCreate.headers()["Replay-Nonce"] ?: nonce
                 accounturi = objAcctCreate.headers()["Location"] ?: ""
                 caadomain = directory.meta.caaIdentities[0]
-                if (domains.isEmpty()) {
+
+            val secondresponse = if (method == "http-01") {
+                "Leave \"domains\" blank to get Server Config"
+            }
+            else
+            {
+                "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+            }
+
+                if ((domains.isEmpty())&&(method == "dns-persist-01")) {
                     onProgress(0)
                     return Pair(
                         "Please add the above DNS record to your DNS, remembering to replace YOURDOMAIN.TLD with your domain",
-                        "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                        secondresponse
                     )
                 }
                 else
                 {
                     onProgress(2)
-                    val listdomains = domains.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { listOf(it, "*.$it") }.distinct()
+                    val listdomains: List<String> = if (method == "http-01") {
+                        domains.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { listOf(it) }.distinct()
+                    } else {
+                        domains.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { listOf(it, "*.$it") }.distinct()
+                    }
+
                     val jsonorder = """{"identifiers": [${listdomains.joinToString(",") { """{"type": "dns", "value": "$it"}""" }}]}"""
                     val order = api.getOrder(directory.newOrder, genJWK(directory.newOrder, ecPrivate, jsonorder, accounturi))
                     if (order.code() > 399) {
                         onProgress(0)
                         return Pair(
                             "Unable to create order - did you request certificate for a blacklisted domain?",
-                            "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                            secondresponse
                         )
                     }
                     nonce = order.headers()["Replay-Nonce"] ?: nonce
@@ -674,7 +738,7 @@ if (isLandscape) {
                         val autz = api.getAutz(auth, genJWK(auth, ecPrivate, "", accounturi ))
                         nonce = autz.headers()["Replay-Nonce"] ?: nonce
                         for (chal in autz.body()!!.challenges) {
-                        if (chal.type == "dns-persist-01") {
+                        if (chal.type == method) {
                           val blpost = api.blankPost(chal.url, genJWK(chal.url, ecPrivate, "{}", accounturi))
                             nonce = blpost.headers()["Replay-Nonce"] ?: nonce
                             break
@@ -692,8 +756,8 @@ if (isLandscape) {
                         if (ordercheck.body()!!.status == "invalid") {
                             onProgress(0)
                             return Pair(
-                                "Error validating domains, you have not published the DNS records yet!",
-                                "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                                "Error validating domains, you have not published the DNS records or added the HTTP server config yet!",
+                                secondresponse
                             )
                         }
                         if (ordercheck.body()!!.status == "ready") {
@@ -705,13 +769,13 @@ if (isLandscape) {
                     val kpp = ECPrivateKeySpec(BigInteger(1, hbb), ecSpec)
                     val kfp = KeyFactory.getInstance("EC", "AndroidOpenSSL")
                     val crtprivate = kfp.generatePrivate(kpp)
-                    val csrjson = "{\"csr\": \"" + android.util.Base64.encodeToString(genCSR(crtprivate, domains), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING) + "\"}"
+                    val csrjson = "{\"csr\": \"" + android.util.Base64.encodeToString(genCSR(crtprivate, domains, method), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING) + "\"}"
                     val csrresponse = api.blankPost(ordercheck.body()!!.finalize, genJWK(ordercheck.body()!!.finalize, ecPrivate, csrjson , accounturi))
                     if (csrresponse.code() > 399) {
                         onProgress(0)
                         return Pair(
                             "Unable to submit CSR - something in the CSR is wierd?",
-                            "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                            secondresponse
                         )
                     }
                     nonce = csrresponse.headers()["Replay-Nonce"] ?: nonce
@@ -726,7 +790,7 @@ if (isLandscape) {
                         if (ordercheck.body()!!.status == "invalid") {
                             return Pair(
                                 "Error submitting CSR!",
-                                "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                                secondresponse
                             )
                         }
                         if (ordercheck.body()!!.status == "valid") {
@@ -738,7 +802,7 @@ if (isLandscape) {
                     onProgress(0)
                     return Pair(
                         pemcertificate.body()!!.string(),
-                        "_validation-persist.YOURDOMAIN.TLD IN TXT \"$caadomain;accounturi=$accounturi;policy=wildcard\""
+                        secondresponse
                     )
 
                 }
@@ -788,7 +852,7 @@ fun genJWK(url: String, privkey: PrivateKey, payload: String, accounturi: String
 return acmeRequestBody.toRequestBody("application/jose+json".toMediaType())
 }
 
-fun genKey(passwd: String, domains: String, format: String): Pair<String, String> {
+fun genKey(passwd: String, domains: String, format: String, method: String): Pair<String, String> {
     if (passwd.isEmpty()) {
         return Pair("", "The password cannot be empty.")
     }
@@ -815,7 +879,7 @@ fun genKey(passwd: String, domains: String, format: String): Pair<String, String
             "-----BEGIN PRIVATE KEY-----\n" + Base64.getEncoder().encodeToString(eCPrivate.encoded)
                 .chunked(64)
                 .joinToString("\n") + "\n-----END PRIVATE KEY-----\n\n-----BEGIN CERTIFICATE REQUEST-----\n" + Base64.getEncoder()
-                .encodeToString(genCSR(eCPrivate, domains)).chunked(64)
+                .encodeToString(genCSR(eCPrivate, domains, method)).chunked(64)
                 .joinToString("\n") + "\n-----END CERTIFICATE REQUEST-----"
         }
     }
@@ -824,7 +888,7 @@ fun genKey(passwd: String, domains: String, format: String): Pair<String, String
     return Pair(certState, "_PORT._tcp.YOURDOMAIN.TLD IN TLSA 3 1 1 $spkihex")
 }
 
-fun genCSR(privateKey: PrivateKey, domainString: String): ByteArray {
+fun genCSR(privateKey: PrivateKey, domainString: String, method: String): ByteArray {
     val domains = domainString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     val mainDomain = domains.first()
     val dnInner = "06035504030c" + toAsn1Hex(mainDomain.toByteArray())
@@ -832,7 +896,9 @@ fun genCSR(privateKey: PrivateKey, domainString: String): ByteArray {
     var sansHex = ""
     for (d in domains) {
         sansHex += "82" + toAsn1Hex(d.toByteArray())
-        sansHex += "82" + toAsn1Hex("*.$d".toByteArray())
+        if (method == "dns-persist-01") {
+            sansHex += "82" + toAsn1Hex("*.$d".toByteArray())
+        }
     }
     var extensionRequest = wrap("30", sansHex)
     extensionRequest = "0603551d1104" + toAsn1Hex(hexToByteArray(extensionRequest))
