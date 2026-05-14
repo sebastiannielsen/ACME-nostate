@@ -5,7 +5,7 @@ Imports System.Runtime.Serialization.Json
 Imports System.Security.Cryptography
 Imports System.Security.Cryptography.X509Certificates
 Imports System.Text
-Imports System.Linq
+Imports System.Text.RegularExpressions
 
 Module Module1
     <DllImport("kernel32.dll", EntryPoint:="AttachConsole", SetLastError:=True)>
@@ -19,33 +19,41 @@ Module Module1
 
     Sub Main()
         Dim args As String() = Environment.GetCommandLineArgs()
+        Dim flags As String
         If args.Length > 1 Then
             Dim resultarray() As String
             ConnectToConsole(-1)
 
-            If args(1).Length < 1 Then
-                Console.WriteLine("Password cannot be blank. Use a secure password so nobody guess your private key.")
+            If ((args.Length < 3) Or (args(1).Length < 1)) Then
+                Console.WriteLine("Password and flags cannot be blank. Use a secure password so nobody guess your private key.")
                 Environment.Exit(1)
                 Exit Sub
             End If
-            If args.Length < 3 Then
+            flags = Regex.Replace(args(2), "[^12]", "")
+            If flags.Length < 1 Then
+                Console.WriteLine("Flag must be 1 = use DNS-PERSIST-01, 2 = use HTTP-01")
+                Environment.Exit(1)
+                Exit Sub
+            End If
+            flags = flags.Substring(0, 1)
+            If args.Length < 4 Then
                 'No filename specified, user wants the DNS-PERSIST-01 record
-                resultarray = GenerateCert(args(1), "", Nothing).GetAwaiter.GetResult()
-                Console.WriteLine(resultarray(0))
+                resultarray = GenerateCert(args(1), "", (flags = 2), Nothing).GetAwaiter.GetResult()
+                Console.WriteLine(resultarray(Int(flags - 1)))
                 Environment.Exit(0)
                 Exit Sub
             End If
-            If (args(3) = "export") Then
-                File.WriteAllBytes(args(2), Encoding.UTF8.GetBytes(GenerateKeyAndCSR(args(1), "")(0)))
-                Console.WriteLine("Written private key to " & args(2))
+            If (args(4) = "export") Then
+                File.WriteAllBytes(args(3), Encoding.UTF8.GetBytes(GenerateKeyAndCSR(args(1), "", False)(0)))
+                Console.WriteLine("Written private key to " & args(3))
                 Environment.Exit(0)
                 Exit Sub
             End If
-            Dim domains = args.Skip(3)
+            Dim domains = args.Skip(4)
             Dim domainString As String = String.Join(",", domains)
-            resultarray = GenerateCert(args(1), domainString, Nothing).GetAwaiter.GetResult()
+            resultarray = GenerateCert(args(1), domainString, (flags = 2), Nothing).GetAwaiter.GetResult()
             If (resultarray(1).Contains("-----BEGIN CERTIFICATE-----")) Then
-                File.WriteAllBytes(args(2), Encoding.UTF8.GetBytes(resultarray(1)))
+                File.WriteAllBytes(args(3), Encoding.UTF8.GetBytes(resultarray(1)))
                 Console.WriteLine("Successfully generated LE certificate!")
                 Environment.Exit(0)
                 Exit Sub
@@ -54,7 +62,6 @@ Module Module1
                 Environment.Exit(1)
                 Exit Sub
             End If
-            SendKeys.SendWait("{ENTER}")
         Else
             DoConsole()
             Application.EnableVisualStyles()
@@ -64,7 +71,7 @@ Module Module1
     End Sub
 
 
-    Public Async Function GenerateCert(password As String, domains As String, progress As IProgress(Of Integer)) As Task(Of String())
+    Public Async Function GenerateCert(password As String, domains As String, http As Boolean, progress As IProgress(Of Integer)) As Task(Of String())
         Dim returnvalue(2) As String
 
         Try
@@ -85,6 +92,31 @@ Module Module1
             End If
 
             Dim dsa_acct As ECDsa = GenPrivKey(password & "-")
+
+
+            If (http = True) And (domains.Length < 4) Then
+                Dim kx As String = System.Convert.ToBase64String(dsa_acct.ExportParameters(False).Q.X).Replace("+", "-").Replace("/", "_").Replace("=", "")
+                Dim ky As String = System.Convert.ToBase64String(dsa_acct.ExportParameters(False).Q.Y).Replace("+", "-").Replace("/", "_").Replace("=", "")
+                Dim stringtohash As String
+                stringtohash = "{""crv"":""P-384"",""kty"":""EC"",""x"":""" & kx & """,""y"":""" & ky & """}"
+                Dim sha256hash As SHA256 = SHA256.Create()
+                Dim keyAuth As Byte() = sha256hash.ComputeHash(Encoding.UTF8.GetBytes(stringtohash))
+                Dim keyauthstring = System.Convert.ToBase64String(keyAuth).Replace("+", "-").Replace("/", "_").Replace("=", "")
+
+                Dim buildconfig1 As String = "Apache2 Or LiteSpeed/OpenLiteSpeed:" & Environment.NewLine & "-----------------------------------------------------" & Environment.NewLine & "<Location ""/.well-known/acme-challenge/"">" & Environment.NewLine & "    RewriteEngine On" & Environment.NewLine & "    RewriteRule ""\/([-_a-zA-Z0-9]+)$"" ""\/$1"" [E=challenge:$1]" & Environment.NewLine & "    ErrorDocument 200 ""%{ENV:challenge}."
+                Dim buildconfig2 As String = """" & Environment.NewLine & "    RewriteRule ^ - [L,R=200]" & Environment.NewLine & "</Location>" & Environment.NewLine & "" & Environment.NewLine & "Nginix:" & Environment.NewLine & "-----------------------------------------------------" & Environment.NewLine & "location ~ ^/\.well-known/acme-challenge/([-_a-zA-Z0-9]+)$ {" & Environment.NewLine & "    default_type text/plain;" & Environment.NewLine & "    return 200 ""$1."
+                Dim buildconfig3 As String = """;" & Environment.NewLine & "}" & Environment.NewLine & "" & Environment.NewLine & "IIS web.config:" & Environment.NewLine & "-----------------------------------------------------" & Environment.NewLine & "<?xml version=""1.0"" encoding=""UTF-8""?><configuration>" & Environment.NewLine & "<system.webServer><rewrite><rules>" & Environment.NewLine & "<rule name=""ACME-Challenge"" stopProcessing=""true"">" & Environment.NewLine & "<match url=""^\.well-known/acme-challenge/([-_a-zA-Z0-9]+)$"" />" & Environment.NewLine & "<action type=""CustomResponse"" statusCode=""200"" statusReason=""OK"" statusDescription=""{R:1}."
+                Dim buildconfig4 As String = """ />" & Environment.NewLine & "</rule></rules></rewrite></system.webServer></configuration>"
+
+                returnvalue(0) = "Paste the right config snippet in your HTTP server configuration"
+                returnvalue(1) = buildconfig1 & keyauthstring & buildconfig2 & keyauthstring & buildconfig3 & keyauthstring & buildconfig4
+                If progress IsNot Nothing Then
+                    progress.Report(9)
+                End If
+                Await Task.Delay(500)
+                Return returnvalue
+            End If
+
             Dim browser As New Net.Http.HttpClient
             Dim result As MemoryStream
             Dim accounturi As String
@@ -130,7 +162,12 @@ Module Module1
 
             currentnonce = responsemess.Headers.GetValues("Replay-Nonce").FirstOrDefault()
             accounturi = responsemess.Headers.Location.OriginalString
-            returnvalue(0) = "_validation-persist.YOURDOMAIN.TLD IN TXT """ & serverdirectory.Caadomain & ";accounturi=" & accounturi & ";policy=wildcard"""
+
+            If (http = True) Then
+                returnvalue(0) = "You have selected HTTP-01 and should have provisioned the config that were shown when you did not fill in the domains."
+            Else
+                returnvalue(0) = "_validation-persist.YOURDOMAIN.TLD IN TXT """ & serverdirectory.Caadomain & ";accounturi=" & accounturi & ";policy=wildcard"""
+            End If
             If (domains.Length > 3) Then
                 Dim orderuri As String
 
@@ -143,7 +180,11 @@ Module Module1
                 alldomains = domains.Split(",")
                 For Each item In alldomains
                     If (item.Length > 0) Then
-                        jwkpayload = jwkpayload & "{""type"": ""dns"", ""value"": """ & item & """},{""type"": ""dns"", ""value"": ""*." & item & """},"
+                        If (http = True) Then
+                            jwkpayload = jwkpayload & "{""type"": ""dns"", ""value"": """ & item & """},"
+                        Else
+                            jwkpayload = jwkpayload & "{""type"": ""dns"", ""value"": """ & item & """},{""type"": ""dns"", ""value"": ""*." & item & """},"
+                        End If
                     End If
                 Next
                 jwkpayload = jwkpayload.Substring(0, jwkpayload.Length - 1)
@@ -174,7 +215,7 @@ Module Module1
                 ' Submit the DNS-PERSIST-01 challenge for all authorization. Since the DNS-PERSIST-01 record should be pre-provisioned, we dont need to pause execution to let the user publish
 
                 For Each item In acmeorder.Authorizations
-                    currentnonce = Await SubmitChallenge(dsa_acct, item, currentnonce, accounturi)
+                    currentnonce = Await SubmitChallenge(dsa_acct, item, currentnonce, accounturi, http)
                 Next
 
                 ' Wait until Lets Encrypt server finishes the validations.
@@ -202,7 +243,7 @@ Module Module1
                 ' Submit CSR to Lets encrypt server
 
                 currentnonce = orderarray(0)
-                jwkpayload = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{""csr"": """ & System.Convert.ToBase64String(GenCSR(password, domains)).Replace("+", "-").Replace("/", "_").Replace("=", "") & """}")).Replace("+", "-").Replace("/", "_").Replace("=", "")
+                jwkpayload = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{""csr"": """ & System.Convert.ToBase64String(GenCSR(password, domains, http)).Replace("+", "-").Replace("/", "_").Replace("=", "") & """}")).Replace("+", "-").Replace("/", "_").Replace("=", "")
                 jwkheader = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{""alg"": ""ES384"", ""kid"": """ & accounturi & """, ""nonce"": """ & currentnonce & """, ""url"": """ & orderarray(2) & """}")).Replace("+", "-").Replace("/", "_").Replace("=", "")
                 jwksignature = System.Convert.ToBase64String(dsa_acct.SignData(System.Text.Encoding.UTF8.GetBytes(jwkheader & "." & jwkpayload), HashAlgorithmName.SHA384)).Replace("+", "-").Replace("/", "_").Replace("=", "")
                 PostContent = New Net.Http.StringContent("{""protected"": """ & jwkheader & """, ""payload"": """ & jwkpayload & """, ""signature"": """ & jwksignature & """}", System.Text.Encoding.UTF8, "application/jose+json")
@@ -289,7 +330,14 @@ Module Module1
 
 
 
-    Public Async Function SubmitChallenge(privatekey As ECDsa, autzurl As String, nonce As String, accounturi As String) As Task(Of String)
+    Public Async Function SubmitChallenge(privatekey As ECDsa, autzurl As String, nonce As String, accounturi As String, http As Boolean) As Task(Of String)
+        Dim checkstring As String
+        If (http = True) Then
+            checkstring = "http-01"
+        Else
+            checkstring = "dns-persist-01"
+        End If
+
         Dim browser As New Net.Http.HttpClient
         Dim pgres = New Net.Http.HttpResponseMessage
         Dim jwkh As String = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{""alg"": ""ES384"", ""kid"": """ & accounturi & """, ""nonce"": """ & nonce & """, ""url"": """ & autzurl & """}")).Replace("+", "-").Replace("/", "_").Replace("=", "")
@@ -304,7 +352,7 @@ Module Module1
         Dim acmeautz As ACMEAuthorization = DirectCast(chals.ReadObject(chal), ACMEAuthorization)
 
         For Each item In acmeautz.Challenges
-            If (item.Type.ToLower = "dns-persist-01") Then
+            If (item.Type.ToLower = checkstring) Then
                 jwkh = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{""alg"": ""ES384"", ""kid"": """ & accounturi & """, ""nonce"": """ & nonce & """, ""url"": """ & item.Url & """}")).Replace("+", "-").Replace("/", "_").Replace("=", "")
                 jwks = System.Convert.ToBase64String(privatekey.SignData(System.Text.Encoding.UTF8.GetBytes(jwkh & ".e30"), HashAlgorithmName.SHA384)).Replace("+", "-").Replace("/", "_").Replace("=", "")
                 postasget = New Net.Http.StringContent("{""protected"": """ & jwkh & """, ""payload"": ""e30"", ""signature"": """ & jwks & """}", System.Text.Encoding.UTF8, "application/jose+json")
@@ -318,7 +366,7 @@ Module Module1
     End Function
 
 
-    Public Function GenerateKeyAndCSR(password As String, domains As String) As String()
+    Public Function GenerateKeyAndCSR(password As String, domains As String, http As Boolean) As String()
         Dim sha384hash As SHA384 = SHA384.Create()
         Dim sha256hash As SHA256 = SHA256.Create()
         Dim returnvalue(2) As String
@@ -330,29 +378,31 @@ Module Module1
         returnvalue(0) = returnvalue(0).Replace(vbCrLf, vbLf).Replace(vbLf, vbCrLf)
         returnvalue(2) = "_PORT._tcp.YOURDOMAIN.TLD IN TLSA 3 1 1 " & BitConverter.ToString(sha256hash.ComputeHash(SPKI(GenPrivKey(password)))).Replace("-", "").ToLower()
         If (domains.Length > 3) And (Not domains.Contains("*")) Then
-            returnvalue(1) = "-----BEGIN CERTIFICATE REQUEST-----" & Environment.NewLine & System.Convert.ToBase64String(GenCSR(password, domains), Base64FormattingOptions.InsertLineBreaks) & Environment.NewLine & "-----END CERTIFICATE REQUEST-----"
+            returnvalue(1) = "-----BEGIN CERTIFICATE REQUEST-----" & Environment.NewLine & System.Convert.ToBase64String(GenCSR(password, domains, http), Base64FormattingOptions.InsertLineBreaks) & Environment.NewLine & "-----END CERTIFICATE REQUEST-----"
             returnvalue(1) = returnvalue(1).Replace(vbCrLf, vbLf).Replace(vbLf, vbCrLf)
         End If
         Return returnvalue
     End Function
 
 
-    Public Function GenCSR(password As String, domains As String) As Byte()
+    Public Function GenCSR(password As String, domains As String, http As Boolean) As Byte()
         Dim alldomains() As String
         Dim firstdomain As String
         firstdomain = ""
         Dim sanBuilder As New SubjectAlternativeNameBuilder()
         Dim dsa As ECDsa = GenPrivKey(password)
         alldomains = domains.Split(",")
-            For Each item In alldomains
-                If (firstdomain.Length < 1) And (item.Length > 2) Then
-                    firstdomain = item
-                End If
-                If Not String.IsNullOrWhiteSpace(item.Trim) Then
-                    sanBuilder.AddDnsName(item.Trim)
+        For Each item In alldomains
+            If (firstdomain.Length < 1) And (item.Length > 2) Then
+                firstdomain = item
+            End If
+            If Not String.IsNullOrWhiteSpace(item.Trim) Then
+                sanBuilder.AddDnsName(item.Trim)
+                If (http = False) Then
                     sanBuilder.AddDnsName("*." & item.Trim)
                 End If
-            Next
+            End If
+        Next
         Dim subjectName As New X500DistinguishedName("CN=" & firstdomain)
         Dim csr As New CertificateRequest(subjectName, dsa, HashAlgorithmName.SHA384)
         csr.CertificateExtensions.Add(sanBuilder.Build())
