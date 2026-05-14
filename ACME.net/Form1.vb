@@ -15,7 +15,7 @@ Public Class Form1
         If TextBox1.Text.Length < 1 Then
             MsgBox("Password cannot be blank. Use a secure password so nobody guess your private key.", vbInformation, "Blank password")
         Else
-            returnedcontent = GenerateKeyAndCSR(TextBox1.Text, TextBox2.Text)
+            returnedcontent = GenerateKeyAndCSR(TextBox1.Text, TextBox2.Text, RadioButton2.Checked)
             TextBox4.Text = returnedcontent(0) & Environment.NewLine & Environment.NewLine & returnedcontent(1)
             TextBox3.Text = returnedcontent(2)
         End If
@@ -40,7 +40,7 @@ Public Class Form1
                                                                Button1.Text = "Generating Certificate..." & Environment.NewLine & "[" & New String("#"c, value).PadRight(9, "_"c) & "]"
                                                            End Sub)
 
-            returnedcontent = Await GenerateCert(TextBox1.Text, TextBox2.Text, progressHandler)
+            returnedcontent = Await GenerateCert(TextBox1.Text, TextBox2.Text, RadioButton2.Checked, progressHandler)
             Button1.Text = "Generate DNS" & Environment.NewLine & "or Certificate"
             TextBox1.Enabled = True
             TextBox2.Enabled = True
