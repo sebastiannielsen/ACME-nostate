@@ -125,7 +125,7 @@ if (length($ARGV[3]) > 4) {
             $acme->poll_order($order);
         }
         $pem = $acme->get_certificate_chain($order);
-        open(CERTFILE, ">".$ARGV[1]);
+        open(CERTFILE, ">".$ARGV[2]);
         print CERTFILE $pem;
         close(CERTFILE);
         print "Successfully generated LE certificate!\n";
