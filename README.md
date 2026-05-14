@@ -1,5 +1,5 @@
 # ACME-nostate
-A stateless DNS-PERSIST-01 secp384r1 ACME client in different languages with cross-compatibility, making it possible to easily request certificates across different platforms.
+A stateless DNS-PERSIST-01 / HTTP-01 secp384r1 ACME client in different languages with cross-compatibility, making it possible to easily request certificates across different platforms.
 
 # ACME.pl and ACME-nostate.exe usage:
 
@@ -22,7 +22,7 @@ Export private key
 ACME-nostate.exe [secret password] [file to write private key to] export
 
 
-Get DNS-PERSIST-01 record
+Get DNS-PERSIST-01 / HTTP-01 record
 
 ./ACME.pl [secret password]
 
@@ -52,7 +52,7 @@ echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xar
 
 # Limitations (changes against limits will NOT be accepted):
 
-- Does ONLY support DNS-PERSIST-01 - this because the client has no state and cannot remember orders or authorizations "across runs". DNS-PERSIST-01 can be validated in one "swoop" without having to pause the execution.
+- Does ONLY support DNS-PERSIST-01 and a "persist" model of HTTP-01 - this because the client has no state and cannot remember orders or authorizations "across runs". DNS-PERSIST-01 and HTTP-01 with persist can be validated in one "swoop" without having to pause the execution.
 - Does ONLY support secp384r1 keys - this to make stateless key generation possible.
 - Does ONLY support wildcard generation - this to make code easier.
 - Does NOT support ARI or similiar protocols - due to the stateless nature.
@@ -60,7 +60,7 @@ echo -n "[secret password]-" | openssl dgst -sha384 -binary | xxd -p -c 48 | xar
 
 # Use cases:
 
-You can set up the DNS-PERSIST-01 record on a DNS server, and then you can call your friend on the other side of the globe, tell him your password, and then he can generate certificates.
+You can set up the DNS-PERSIST-01 DNS record or HTTP-01 server configuration, and then you can call your friend on the other side of the globe, tell him your password, and then he can generate certificates.
 
 You can "pre-provision" a server with private keys and then use the same password to generate the certificate
 
