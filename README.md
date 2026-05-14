@@ -10,23 +10,25 @@ Requirements for ACME-nostate.exe: .NET Framework 4.7.2
 
 Generate certificate
 
-./ACME.pl [secret password] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
+./ACME.pl [secret password] [FLAG] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
 
-ACME-nostate.exe [secret password] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
+ACME-nostate.exe [secret password] [FLAG] [file to write certificate to] [domain1] [domain2] [domain3] and so on...
 
 
 Export private key
 
-./ACME.pl [secret password] [file to write private key to] export
+./ACME.pl [secret password] [FLAG] [file to write private key to] export
 
-ACME-nostate.exe [secret password] [file to write private key to] export
+ACME-nostate.exe [secret password] [FLAG] [file to write private key to] export
 
 
 Get DNS-PERSIST-01 / HTTP-01 record
 
-./ACME.pl [secret password]
+./ACME.pl [secret password] [FLAG]
 
-ACME-nostate.exe [secret password]
+ACME-nostate.exe [secret password] [FLAG]
+
+[FLAG] should be 1 for DNS-PERSIST-01 and 2 for HTTP-01.
 
 # ACME.html, ACME-nostate.exe, ACME-nostate.apk usage:
 
