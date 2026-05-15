@@ -30,12 +30,16 @@ $acct = Crypt::PK::ECC->new();
 $acct->import_key_raw($acctpassword, "secp384r1");
 
 if ($ARGV[3] eq "export") {
+$bcertpass = pack("H*", sha384_hex($inpass));
+$bcert = Crypt::PK::ECC->new();
+$bcert->import_key_raw($bcertpass, "secp384r1");
 open(PEMFILE, ">".$ARGV[2]);
-print PEMFILE $cert->export_key_pem('private');
+print PEMFILE $bcert->export_key_pem('private');
 close(PEMFILE);
 print "Written private key to ".$ARGV[2]."\n";
 exit;
 }
+
 
 $acme = Net::ACME2::LetsEncrypt->new( key => $acct->export_key_pem('private'), environment => 'staging');
 
